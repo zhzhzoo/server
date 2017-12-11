@@ -3341,6 +3341,62 @@ sub run_query {
   return $res
 }
 
+sub run_query_output {
+  my ($mysqld, $query, $outfile)= @_;
+
+  my $args;
+  mtr_init_args(\$args);
+  mtr_add_arg($args, "--defaults-file=%s", $path_config_file);
+  mtr_add_arg($args, "--defaults-group-suffix=%s", $mysqld->after('mysqld'));
+
+  mtr_add_arg($args, "--silent");
+  mtr_add_arg($args, "--execute=%s", $query);
+
+  my $res= My::SafeProcess->run
+    (
+     name          => "run_query_output -> ".$mysqld->name(),
+     path          => $exe_mysql,
+     args          => \$args,
+     output        => $outfile,
+     error         => $outfile
+    );
+
+  return $res
+}
+
+sub wait_wsrep_ready($$) {
+  my ($tinfo, $mysqld)= @_;
+
+  my $sleeptime= 100; # Milliseconds
+  my $loops= ($opt_start_timeout * 1000) / $sleeptime;
+
+  my $name= $mysqld->name();
+  my $outfile= "$opt_vardir/tmp/$name.wsrep_ready";
+  my $query= "SET SESSION wsrep_sync_wait = 0;
+              SELECT VARIABLE_VALUE
+              FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+              WHERE VARIABLE_NAME = 'wsrep_ready'";
+
+  for (my $loop= 1; $loop <= $loops; $loop++)
+  {
+    if (run_query_output($mysqld, $query, $outfile) != 0)
+    {
+      $tinfo->{logfile}= "WSREP error while trying to determine node state";
+      return 0;
+    }
+
+    if (mtr_grab_file($outfile) =~ /^ON/)
+    {
+      unlink($outfile);
+      return 1;
+    }
+
+    mtr_milli_sleep($sleeptime);
+  }
+
+  $tinfo->{logfile}= "WSREP did not transition to state READY";
+  return 0;
+}
 
 sub do_before_run_mysqltest($)
 {
@@ -3967,6 +4023,7 @@ sub run_testcase ($$) {
   my $test= $tinfo->{suite}->start_test($tinfo);
   # Set only when we have to keep waiting after expectedly died server
   my $keep_waiting_proc = 0;
+  my $keep_waiting_proc_old = 0;
   my $print_timeout= start_timer($print_freq * 60);
 
   while (1)
@@ -3978,6 +4035,7 @@ sub run_testcase ($$) {
       $proc = My::SafeProcess->check_any();
       if ($proc)
       {
+	$keep_waiting_proc_old = $keep_waiting_proc;
 	mtr_verbose ("Found exited process $proc");
       }
       else
@@ -4136,7 +4194,8 @@ sub run_testcase ($$) {
     if ($check_crash)
     {
       # Keep waiting if it returned 2, if 1 don't wait or stop waiting.
-      $keep_waiting_proc = 0 if $check_crash == 1;
+      $keep_waiting_proc = $keep_waiting_proc_old if $check_crash == 1;
+      $keep_waiting_proc_old = 0 if $check_crash == 1;
       $keep_waiting_proc = $proc if $check_crash == 2;
       next;
     }
@@ -5357,6 +5416,32 @@ sub stop_servers($$) {
   }
 }
 
+sub have_wsrep($$) {
+  my ($tinfo, $mysqld)= @_;
+
+  if (defined $mysqld_variables{'wsrep-on'}) {
+    my $name= $mysqld->name();
+    my $outfile= "$opt_vardir/tmp/$name.wsrep_on";
+    my $query= "SET SESSION wsrep_sync_wait = 0;
+              SELECT VARIABLE_VALUE
+              FROM INFORMATION_SCHEMA.GLOBAL_STATUS
+              WHERE VARIABLE_NAME = 'wsrep_on'";
+
+    if (run_query_output($mysqld, $query, $outfile) != 0) {
+      $tinfo->{logfile}= "WSREP error while trying to determine node state";
+      return 0;
+    }
+
+    if (mtr_grab_file($outfile) =~ /^ON/) {
+      unlink($outfile);
+      return 1;
+    }
+
+    return 0;
+  }
+
+  return 0;
+}
 
 #
 # start_servers
@@ -5378,6 +5463,10 @@ sub start_servers($) {
     next unless $_->{WAIT} and started($_);
     if ($_->{WAIT}->($_)) {
       $tinfo->{comment}= "Failed to start ".$_->name() . "\n";
+      return 1;
+    }
+
+    if (have_wsrep($tinfo, $_) && !wait_wsrep_ready($tinfo, $_)) {
       return 1;
     }
   }
