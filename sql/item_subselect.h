@@ -739,6 +739,8 @@ public:
     return 0;
   };
 
+  bool pushdown_cond_for_in_subquery(THD *thd, Item *cond);
+
   friend class Item_ref_null_helper;
   friend class Item_is_not_null_test;
   friend class Item_in_optimizer;
@@ -884,8 +886,11 @@ public:
 
   friend class subselect_hash_sj_engine;
   friend class Item_in_subselect;
-  friend bool setup_jtbm_semi_joins(JOIN *join, List<TABLE_LIST> *join_list,
-                                    Item **join_where);
+  friend bool setup_degenerated_jtbm_semi_join(THD *thd, JOIN *join,
+				               TABLE_LIST *table,
+				               Item **join_where,
+				               Item_in_subselect *subq_pred,
+					       bool post_optimize);
 
 };
 

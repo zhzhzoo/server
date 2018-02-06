@@ -7689,7 +7689,7 @@ Item *Item_field::derived_grouping_field_transformer_for_where(THD *thd,
   st_select_lex *sel= (st_select_lex *)arg;
   Grouping_tmp_field *gr_field= find_matching_grouping_field(this, sel);
   if (gr_field)
-    return gr_field->producing_item->build_clone(thd);
+    return gr_field->corresponding_item->build_clone(thd);
   return this;
 }
 
@@ -7702,7 +7702,7 @@ Item_direct_view_ref::derived_grouping_field_transformer_for_where(THD *thd,
     return this;
   st_select_lex *sel= (st_select_lex *)arg;
   Grouping_tmp_field *gr_field= find_matching_grouping_field(this, sel);
-  return gr_field->producing_item->build_clone(thd);
+  return gr_field->corresponding_item->build_clone(thd);
 }
 
 void Item_field::print(String *str, enum_query_type query_type)

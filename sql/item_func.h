@@ -330,6 +330,11 @@ public:
     return Item_args::excl_dep_on_grouping_fields(sel);
   }
 
+  bool excl_dep_on_left_in_subq_part(st_select_lex *sel)
+  {
+    return Item_args::excl_dep_on_left_in_subq_part(sel);
+  }
+
   /*
     We assume the result of any function that has a TIMESTAMP argument to be
     timezone-dependent, since a TIMESTAMP value in both numeric and string

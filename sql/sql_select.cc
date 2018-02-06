@@ -1730,7 +1730,7 @@ JOIN::optimize_inner()
       thd->restore_active_arena(arena, &backup);
   }
   
-  if (setup_jtbm_semi_joins(this, join_list, &conds))
+  if (setup_degenerated_semi_joins_before_optimize_cond(this, join_list, &conds))
     DBUG_RETURN(1);
 
   if (select_lex->cond_pushed_into_where)
@@ -1754,6 +1754,22 @@ JOIN::optimize_inner()
   conds= optimize_cond(this, conds, join_list, FALSE,
                        &cond_value, &cond_equal, OPT_LINK_EQUAL_FIELDS);
   
+  if (thd->lex->sql_command == SQLCOM_SELECT &&
+      optimizer_flag(thd, OPTIMIZER_SWITCH_COND_PUSHDOWN_FOR_SUBQUERY))
+  {
+    TABLE_LIST *tbl;
+    List_iterator_fast<TABLE_LIST> li(select_lex->leaf_tables);
+    while ((tbl= li++))
+      if (tbl->jtbm_subselect)
+      {
+	if (tbl->jtbm_subselect->pushdown_cond_for_in_subquery(thd, conds))
+          DBUG_RETURN(1);
+      }
+  }
+
+  if (setup_jtbm_semi_joins(this, join_list, &conds, &cond_value))
+    DBUG_RETURN(1);
+
   if (thd->lex->sql_command == SQLCOM_SELECT &&
       optimizer_flag(thd, OPTIMIZER_SWITCH_COND_PUSHDOWN_FOR_DERIVED))
   {
@@ -1792,7 +1808,7 @@ JOIN::optimize_inner()
     if (select_lex->handle_derived(thd->lex, DT_OPTIMIZE))
       DBUG_RETURN(1);
   }
-     
+
   if (thd->is_error())
   {
     error= 1;
@@ -13487,7 +13503,7 @@ finish:
     FALSE   otherwise
 */
 
-static bool check_simple_equality(THD *thd, const Item::Context &ctx,
+bool check_simple_equality(THD *thd, const Item::Context &ctx,
                                   Item *left_item, Item *right_item,
                                   COND_EQUAL *cond_equal)
 {

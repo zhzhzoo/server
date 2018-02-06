@@ -1305,8 +1305,7 @@ bool pushdown_cond_for_derived(THD *thd, Item *cond, TABLE_LIST *derived)
 
       Item *cond_over_partition_fields;; 
       sl->collect_grouping_fields(thd, common_partition_fields);
-      sl->check_cond_extraction_for_grouping_fields(extracted_cond_copy,
-                                                    derived);
+      sl->check_cond_extraction_for_grouping_fields(extracted_cond_copy);
       cond_over_partition_fields=
         sl->build_cond_for_grouping_fields(thd, extracted_cond_copy, true);
       if (cond_over_partition_fields)
@@ -1355,8 +1354,7 @@ bool pushdown_cond_for_derived(THD *thd, Item *cond, TABLE_LIST *derived)
     */
     Item *cond_over_grouping_fields;
     sl->collect_grouping_fields(thd, sl->join->group_list);
-    sl->check_cond_extraction_for_grouping_fields(extracted_cond_copy,
-                                                  derived);
+    sl->check_cond_extraction_for_grouping_fields(extracted_cond_copy);
     cond_over_grouping_fields=
       sl->build_cond_for_grouping_fields(thd, extracted_cond_copy, true);
   

@@ -129,6 +129,11 @@ public:
     return Item_args::excl_dep_on_grouping_fields(sel);
   }
 
+  bool excl_dep_on_left_in_subq_part(st_select_lex *sel)
+  {
+    return Item_args::excl_dep_on_left_in_subq_part(sel);
+  }
+
   bool check_vcol_func_processor(void *arg) {return FALSE; }
   Item *get_copy(THD *thd)
   { return get_item_copy<Item_row>(thd, this); }

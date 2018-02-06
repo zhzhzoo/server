@@ -26,8 +26,15 @@ int check_and_do_in_subquery_rewrites(JOIN *join);
 bool convert_join_subqueries_to_semijoins(JOIN *join);
 int pull_out_semijoin_tables(JOIN *join);
 bool optimize_semijoin_nests(JOIN *join, table_map all_table_map);
-bool setup_jtbm_semi_joins(JOIN *join, List<TABLE_LIST> *join_list,  
-                           Item **join_where);
+bool setup_degenerated_jtbm_semi_join(THD *thd, JOIN *join,
+				     TABLE_LIST *table,
+				     Item **join_where,
+				     Item_in_subselect *subq_pred);
+bool setup_jtbm_semi_joins(JOIN *join, List<TABLE_LIST> *join_list,
+                           Item **join_where, Item::cond_result *cond_value);
+bool setup_degenerated_semi_joins_before_optimize_cond(JOIN *join,
+						   List<TABLE_LIST> *join_list,
+						      Item **join_where);
 void cleanup_empty_jtbm_semi_joins(JOIN *join, List<TABLE_LIST> *join_list);
 
 // used by Loose_scan_opt

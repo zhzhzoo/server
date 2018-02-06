@@ -3129,6 +3129,9 @@ public:
   {
     return used_tables() & tab_map;
   }
+  bool excl_dep_on_left_in_subq_part(st_select_lex *sel);
+  Item_equal *try_to_merge_equal_items(THD *thd, Item_equal *what);
+
   friend class Item_equal_fields_iterator;
   bool count_sargable_conds(void *arg);
   friend class Item_equal_iterator<List_iterator_fast,Item>;

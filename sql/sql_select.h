@@ -1470,6 +1470,8 @@ public:
   Dynamic_array<KEYUSE_EXT> *ext_keyuses_for_splitting;
 
   JOIN_TAB *sort_and_group_aggr_tab;
+  /* Degenerated before optimize */
+  bool is_orig_degenerated;
 
   JOIN(THD *thd_arg, List<Item> &fields_arg, ulonglong select_options_arg,
        select_result *result_arg)
@@ -1564,6 +1566,7 @@ public:
     emb_sjm_nest= NULL;
     sjm_lookup_tables= 0;
     sjm_scan_tables= 0;
+    is_orig_degenerated= false;
   }
 
   /* True if the plan guarantees that it will be returned zero or one row */
@@ -2326,7 +2329,7 @@ Item_equal *find_item_equal(COND_EQUAL *cond_equal, Field *field,
 extern bool test_if_ref(Item *, 
                  Item_field *left_item,Item *right_item);
 
-inline bool optimizer_flag(THD *thd, uint flag)
+inline bool optimizer_flag(THD *thd, ulonglong flag)
 { 
   return (thd->variables.optimizer_switch & flag);
 }
@@ -2440,5 +2443,9 @@ int create_sort_index(THD *thd, JOIN *join, JOIN_TAB *tab, Filesort *fsort);
 
 JOIN_TAB *first_explain_order_tab(JOIN* join);
 JOIN_TAB *next_explain_order_tab(JOIN* join, JOIN_TAB* tab);
+
+bool check_simple_equality(THD *thd, const Item::Context &ctx,
+                           Item *left_item, Item *right_item,
+                           COND_EQUAL *cond_equal);
 
 #endif /* SQL_SELECT_INCLUDED */
