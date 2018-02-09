@@ -680,7 +680,8 @@ void LEX::start(THD *thd_arg)
   DBUG_ASSERT(!explain);
 
   context_stack.empty();
-  select_stack.empty();
+  //empty select_stack
+  select_stack_top= 0;
   unit.init_query();
   builtin_select.set_linkage(UNSPECIFIED_TYPE);
   builtin_select.distinct= TRUE;
@@ -691,6 +692,7 @@ void LEX::start(THD *thd_arg)
   with_clauses_list= 0;
   with_clauses_list_last_next= &with_clauses_list;
   create_view= NULL;
+  field_list.empty();
   value_list.empty();
   update_list.empty();
   set_var_list.empty();
@@ -5111,7 +5113,9 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
 
   /* stuff dummy SELECT * FROM (...) */
 
-  push_select(dummy_select, thd->mem_root); // for Items & TABLE_LIST
+  if (push_select(dummy_select)) // for Items & TABLE_LIST
+    DBUG_RETURN(NULL);
+
 
   /* add SELECT list*/
   {
@@ -5384,6 +5388,30 @@ bool LEX::make_select_in_brackets(SELECT_LEX* dummy_select,
   DBUG_RETURN(FALSE);
 }
 
+bool LEX::push_new_select(SELECT_LEX *last)
+{
+  DBUG_ENTER("LEX::push_select_new");
+  DBUG_PRINT("info", ("Push last select: %p (%d)",
+                       last, last->select_number));
+  bool res= last_select_stack.push_front(last, thd->mem_root);
+  DBUG_RETURN(res);
+}
+
+
+SELECT_LEX *LEX::pop_new_select_and_wrap()
+{
+  SELECT_LEX *sel;
+  SELECT_LEX *last= pop_new_select();
+  SELECT_LEX *first= last->next_select();
+  last->cut_next();
+  enum sub_select_type op= first->linkage;
+  bool ds= first->distinct;
+  if (!(sel= link_selects_chain_down(first)))
+      return NULL;
+  last->link_neighbour(sel);
+  sel->set_linkage_and_distinct(op, ds);
+  return last;
+}
 
 /**
   Checks if we need finish "automatic brackets" mode
@@ -7665,7 +7693,7 @@ void st_select_lex::rerister_unit(SELECT_LEX_UNIT *unit,
 bool LEX::main_select_push()
 {
   DBUG_ENTER("LEX::main_select_push");
-  if (push_select(&builtin_select, thd->mem_root))
+  if (push_select(&builtin_select))
     DBUG_RETURN(TRUE);
   DBUG_RETURN(FALSE);
 }
@@ -7673,7 +7701,8 @@ bool LEX::main_select_push()
 void LEX::main_select_cut()
 {
   DBUG_ENTER("LEX::main_select_cut");
-  thd->select_number= 0;
+  if (thd->is_main_lex(this))
+    thd->select_number= 0;
   unit.cut_subtree();
   all_selects_list= 0;
   builtin_select.link_prev= NULL; // indicator of removel

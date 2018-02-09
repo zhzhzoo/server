@@ -782,6 +782,11 @@ Virtual_column_info *add_virtual_expression(THD *thd, Item *expr)
     enum sub_select_type unit_type;
     bool distinct;
   } unit_operation;
+  struct
+  {
+    SELECT_LEX *first;
+    SELECT_LEX *prev_last;
+  } select_list;
   Lex_select_lock select_lock;
   Lex_select_limit select_limit;
 
@@ -877,7 +882,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 103 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 103
+%expect 94
 
 /*
    Comments for TOKENS.
@@ -1792,7 +1797,8 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         join_table_list  join_table
         table_factor table_ref esc_table_ref
         table_primary_ident table_primary_derived
-        derived_table_list
+        derived_table_list table_reference_list_parens
+        nested_table_reference_list join_table_parens
 %type <date_time_type> date_time_type;
 %type <interval> interval
 
@@ -1835,6 +1841,18 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         select_part
         select_term
         select_expr
+        query_specification
+        query_specification_parens
+        query_specification_with_opt_parens
+        query_specification_with_opt_tail
+        query_specification_with_opt_tail_parens
+        query_primary
+        query_expression_unit_parens
+        query_expression_unit_with_opt_parens
+        query_expression_unit_with_opt_tail
+        query_expression_unit_with_opt_tail_parens
+
+%type <select_list> query_expression_unit
 
 %type <boolfunc2creator> comp_op
 
@@ -6418,7 +6436,7 @@ parenthesized_expr:
               thd->parse_error();
               MYSQL_YYABORT;
             }
-            SELECT_LEX *sel= lex->select_stack.head();
+            SELECT_LEX *sel= lex->select_stack_head();
             SELECT_LEX_UNIT *unit=
               sel->attach_selects_chain($1, &sel->context);
             if (!unit)
@@ -8707,6 +8725,218 @@ select_new:
         ;
 
 
+query_specification:
+         SELECT_SYM
+         {
+           SELECT_LEX *sel;
+           if (!(sel= Lex->alloc_select(TRUE)) ||
+               Lex->push_select(sel))
+             MYSQL_YYABORT;
+         }
+         select_options
+         select_item_list
+         into
+         opt_from_clause
+         opt_where_clause
+         opt_group_clause
+         opt_having_clause
+         opt_window_clause
+         {
+           $$= Lex->pop_select();
+         }
+       | SELECT_SYM
+         {
+           SELECT_LEX *sel;
+           if (!(sel= Lex->alloc_select(TRUE)) ||
+               Lex->push_select(sel))
+             MYSQL_YYABORT;
+         }
+         select_options
+         select_item_list
+         opt_from_clause
+         opt_where_clause
+         opt_group_clause
+         opt_having_clause
+         opt_window_clause
+         {
+           $$= Lex->pop_select();
+         }
+      ;
+
+opt_from_clause:
+        /* Empty */
+        | from_clause
+        ;
+
+query_specification_parens:
+          '(' query_specification_parens ')'
+          { $$= $2; }
+        | '(' query_specification ')'
+          { $$= $2; }
+        ;
+
+
+query_specification_with_opt_parens:
+          query_specification_parens
+          { $$= $1; }
+        | query_specification
+          { $$= $1; }
+        ;
+
+
+query_specification_with_opt_tail:
+         query_specification_with_opt_parens
+         {
+           Lex->push_select($1);
+         }
+         opt_order_clause
+         opt_limit_clause
+         select_lock_type
+         {
+           Lex->pop_select();
+           $$= $1;
+         }
+       ;
+
+
+query_specification_with_opt_tail_parens:
+         '(' query_specification_with_opt_tail_parens ')'
+          { $$= $2; }
+       | '(' query_specification_with_opt_tail ')'
+          { $$= $2; }
+       ;
+
+query_primary:
+       | query_specification_with_opt_parens
+          { $$= $1; }
+       | query_specification_with_opt_tail_parens
+          { $$= $1; }
+       | query_expression_unit_with_opt_tail_parens
+          { $$= $1; }
+       ;
+
+query_expression_unit_with_opt_tail_parens:
+         '(' query_expression_unit_with_opt_tail_parens ')'
+          { $$= $1; }
+       | '(' query_expression_unit_with_opt_tail ')'
+          { $$= $1; }
+       ;
+
+query_expression_unit_with_opt_tail:
+         query_expression_unit_with_opt_parens
+         opt_order_clause
+         opt_limit_clause
+         opt_select_lock_type
+         {
+           Lex->pop_select(); //query_expression_unit_with_opt_parens put it
+         }
+       ;
+
+query_expression_unit_with_opt_parens:
+         query_expression_unit_parens
+         {
+           $$.first= $1;
+           $$.prev_last= NULL;
+
+           // query_expression_unit_with_opt_tail  will pop it
+           Lex->push_slect($1);
+         }
+       | query_expression_unit
+         {
+           SELECT_LEX *sel;
+           SELECT_LEX *last= $1.prev_last->next_select();
+           int cmp= cmp_unit_op($1.first->next_select()->linkage,
+                                last->linkage);
+           if (cmp < 0)
+           {
+             if (Lex->pop_new_select_and_wrap() == NULL)
+               MYSQL_YYABORT;
+           }
+           if (!(sel= lex->link_selects_chain_down($1.first)))
+              MYSQL_YYABORT;
+           $$= sel;
+
+           // query_expression_unit_with_opt_tail  will pop it
+           Lex->push_slect(sel->first_inner_unit()->fake_select);
+         }
+       ;
+
+query_expression_unit_parens:
+         '(' query_expression_unit_parens ')'
+          { $$= $2; }
+       | '(' query_expression_unit ')'
+         {
+           SELECT_LEX *sel;
+           SELECT_LEX *last= $2.prev_last->next_select();
+           int cmp= cmp_unit_op($2.first->next_select()->linkage,
+                                last->linkage);
+           if (cmp < 0)
+           {
+             if (Lex->pop_new_select_and_wrap() == NULL)
+               MYSQL_YYABORT;
+           }
+
+           if (!(sel= lex->link_selects_chain_down($2.first)))
+              MYSQL_YYABORT;
+           $$= sel;
+         }
+       ;
+
+query_expression_unit:
+         query_primary  
+         unit_type_decl
+         query_primary
+         {
+           // take pre last SELECT from stack, link last to it and leave the
+           // last
+           //if (Lex->Link_2_stack_top($2))
+           //   YYABORT;
+
+           //Lex->link_select($1, $3, $2);
+           $1->link_neighbour($3);
+           $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
+           $$.first= $1;
+           $$.prev_last= $1;
+         }
+       | query_expression_unit
+         unit_type_decl
+         query_primary
+         {
+           /*
+           if priority(query_primary) > priority(query_expression_body)
+             pop from stack; add sel for popped; push to stack
+           end if
+           add sel for query primary
+           */
+           //if (Lex->Link_2_stack_top($2))
+           //   YYABORT;
+           SELECT_LEX *sel;
+           SELECT_LEX *last= $1.prev_last->next_select();
+           int cmp= cmp_unit_op($3->linkage, last->linkage);
+           if (cmp == 0)
+           {
+             //Lex->link_select(last, $3, $2);
+             last->link_neighbour($3);
+             $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
+           }
+           else if (cmp > 0)
+           {
+             // Store beginning and continue...
+             if (Lex->push_new_select(last))
+               MYSQL_YYABORT;
+             last->link_neighbour($3);
+             $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
+           }
+           else /* cmp < 0 */
+           {
+             if ((last= Lex->pop_new_select_and_wrap()) == NULL)
+               MYSQL_YYABORT;
+           }
+           $$.first= $1.first;
+           $$.prev_last= last;
+         }
+       ;
+
 /* Chain of selects on top (have to be linked under unit */
 select_expr:
           select_term unit_type_decl select_expr 
@@ -8754,7 +8984,7 @@ select_term:
             lex->nest_level= sel->nest_level;
             if ($3)
             {
-              lex->push_select(sel, thd->mem_root);
+              lex->push_select(sel);
               $3->set_to($$);
               lex->pop_select();
             }
@@ -8772,7 +9002,7 @@ select_part:
             SELECT_LEX *sel;
             if (!(sel= Lex->alloc_select(TRUE)))
               MYSQL_YYABORT;
-            Lex->push_select(sel, thd->mem_root);
+            Lex->push_select(sel);
           }
           select_options_and_item_list opt_table_expression opt_select_lock_type
 
@@ -9081,7 +9311,7 @@ select_option:
               Allow this flag only on the first top-level SELECT statement, if
               SQL_CACHE wasn't specified, and only once per query.
              */
-            if (Lex->current_select != &Lex->builtin_select)
+            if (Lex->first_select_lex())
               my_yyabort_error((ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_NO_CACHE"));
             if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_CACHE)
               my_yyabort_error((ER_WRONG_USAGE, MYF(0), "SQL_CACHE", "SQL_NO_CACHE"));
@@ -9098,7 +9328,7 @@ select_option:
               Allow this flag only on the first top-level SELECT statement, if
               SQL_NO_CACHE wasn't specified, and only once per query.
              */
-            if (Lex->current_select != &Lex->builtin_select)
+            if (Lex->first_select_lex())
               my_yyabort_error((ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_CACHE"));
             if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_NO_CACHE)
               my_yyabort_error((ER_WRONG_USAGE, MYF(0), "SQL_NO_CACHE", "SQL_CACHE"));
@@ -11343,10 +11573,15 @@ esc_table_ref:
 /* Equivalent to <table reference list> in the SQL:2003 standard. */
 /* Warning - may return NULL in case of incomplete SELECT */
 derived_table_list:
-          esc_table_ref { $$=$1; }
+          esc_table_ref
+         {
+           $$=$1;
+           Select->add_joined_table($1);
+         }
         | derived_table_list ',' esc_table_ref
           {
             MYSQL_YYABORT_UNLESS($1 && ($$=$3));
+            Select->add_joined_table($3);
           }
         ;
 
@@ -11365,11 +11600,18 @@ join_table:
             left-associative joins.
           */
           table_ref normal_join table_ref %prec TABLE_REF_PRIORITY
-          { MYSQL_YYABORT_UNLESS($1 && ($$=$3)); $3->straight=$2; }
+          { 
+            MYSQL_YYABORT_UNLESS($1 && ($$=$3));
+            Select->add_joined_table($1);
+            Select->add_joined_table($3);
+            $3->straight=$2;
+          }
         | table_ref normal_join table_ref
           ON
           {
             MYSQL_YYABORT_UNLESS($1 && $3);
+            Select->add_joined_table($1);
+            Select->add_joined_table($3);
             /* Change the current name resolution context to a local context. */
             if (push_new_name_resolution_context(thd, $1, $3))
               MYSQL_YYABORT;
@@ -11386,6 +11628,8 @@ join_table:
           USING
           {
             MYSQL_YYABORT_UNLESS($1 && $3);
+            Select->add_joined_table($1);
+            Select->add_joined_table($3);
           }
           '(' using_list ')'
           { 
@@ -11396,6 +11640,8 @@ join_table:
         | table_ref NATURAL inner_join table_factor
           {
             MYSQL_YYABORT_UNLESS($1 && ($$=$4));
+            Select->add_joined_table($1);
+            Select->add_joined_table($4);
 	    $4->straight=$3;
             add_join_natural($1,$4,NULL,Select);
           }
@@ -11405,6 +11651,8 @@ join_table:
           ON
           {
             MYSQL_YYABORT_UNLESS($1 && $5);
+            Select->add_joined_table($1);
+            Select->add_joined_table($5);
             /* Change the current name resolution context to a local context. */
             if (push_new_name_resolution_context(thd, $1, $5))
               MYSQL_YYABORT;
@@ -11421,6 +11669,8 @@ join_table:
         | table_ref LEFT opt_outer JOIN_SYM table_factor
           {
             MYSQL_YYABORT_UNLESS($1 && $5);
+            Select->add_joined_table($1);
+            Select->add_joined_table($5);
           }
           USING '(' using_list ')'
           { 
@@ -11431,6 +11681,8 @@ join_table:
         | table_ref NATURAL LEFT opt_outer JOIN_SYM table_factor
           {
             MYSQL_YYABORT_UNLESS($1 && $6);
+            Select->add_joined_table($1);
+            Select->add_joined_table($6);
             add_join_natural($1,$6,NULL,Select);
             $6->outer_join|=JOIN_TYPE_LEFT;
             $$=$6;
@@ -11441,6 +11693,8 @@ join_table:
           ON
           {
             MYSQL_YYABORT_UNLESS($1 && $5);
+            Select->add_joined_table($1);
+            Select->add_joined_table($5);
             /* Change the current name resolution context to a local context. */
             if (push_new_name_resolution_context(thd, $1, $5))
               MYSQL_YYABORT;
@@ -11458,6 +11712,8 @@ join_table:
         | table_ref RIGHT opt_outer JOIN_SYM table_factor
           {
             MYSQL_YYABORT_UNLESS($1 && $5);
+            Select->add_joined_table($1);
+            Select->add_joined_table($5);
           }
           USING '(' using_list ')'
           {
@@ -11469,6 +11725,8 @@ join_table:
         | table_ref NATURAL RIGHT opt_outer JOIN_SYM table_factor
           {
             MYSQL_YYABORT_UNLESS($1 && $6);
+            Select->add_joined_table($1);
+            Select->add_joined_table($6);
             add_join_natural($6,$1,NULL,Select);
             LEX *lex= Lex;
             if (!($$= lex->current_select->convert_right_join()))
@@ -11510,31 +11768,75 @@ use_partition:
 
    I.e.
    <table factor> ::= <table primary> [ <sample clause> ]
-*/   
+*/
+   
 /* Warning - may return NULL in case of incomplete SELECT */
+/*
 table_factor:
           table_primary_ident
         | table_primary_derived
         ;
+*/
+table_factor:
+          table_primary_ident { $$= $1; }
+        | table_primary_derived { $$= $1; }
+        | join_table_parens { $$= $1; }
+        | table_reference_list_parens { $$= $1; }
+        ;
+
+table_reference_list_parens:
+          '(' table_reference_list_parens ')' { $$= $2; }
+        | '(' nested_table_reference_list ')'
+          {
+            if (!($$= Select->end_nested_join(thd)))
+              MYSQL_YYABORT;
+          }
+        ;
+
+nested_table_reference_list:
+          table_ref ',' table_ref
+          {
+            if (Select->init_nested_join(thd))
+              MYSQL_YYABORT;
+            Select->add_joined_table($1);
+            Select->add_joined_table($3);
+            $$= $1->embedding;
+          }
+        | nested_table_reference_list ',' table_ref
+          { 
+            Select->add_joined_table($3);
+            $$= $1;
+          }
+        ; 
+
+join_table_parens:
+          '(' join_table_parens ')' { $$= $2; }
+        | '(' join_table ')' 
+          {
+            LEX *lex= Lex;
+            if (!($$= lex->current_select->nest_last_join(thd)))
+            {
+              thd->parse_error();
+              MYSQL_YYABORT;
+            }
+          }
+        ;
+
 
 table_primary_ident:
+          table_ident opt_use_partition opt_table_alias opt_key_definition
           {
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
-          }
-          table_ident opt_use_partition opt_table_alias opt_key_definition
-          {
-            if (!($$= Select->add_table_to_list(thd, $2, $4,
+            if (!($$= Select->add_table_to_list(thd, $1, $3,
                                                 Select->get_table_join_options(),
                                                 YYPS->m_lock_type,
                                                 YYPS->m_mdl_type,
                                                 Select->pop_index_hints(),
-                                                $3)))
+                                                $2)))
               MYSQL_YYABORT;
-            Select->add_joined_table($$);
           }
         ;
-
 
 
 /*
@@ -11562,7 +11864,7 @@ table_primary_derived:
             lex->pop_select_and_context(); //push at the end of select_expr
             lex->derived_tables|= DERIVED_SUBQUERY;
             $2->linkage= DERIVED_TABLE_TYPE;
-            SELECT_LEX *sel= lex->select_stack.head();
+            SELECT_LEX *sel= lex->select_stack_head();
             SELECT_LEX_UNIT *unit=
               sel->attach_selects_chain($2, NULL);
             if(!unit)
@@ -11580,7 +11882,6 @@ table_primary_derived:
                                              ti, $5, 0,
                                              TL_READ, MDL_SHARED_READ)))
               MYSQL_YYABORT;
-            sel->add_joined_table($$);
             /* Use $2 instead of Lex->current_select as derived table will
                alter value of Lex->current_select. */
 /*
@@ -11615,7 +11916,6 @@ table_primary_derived:
                                                TL_READ, MDL_SHARED_READ)))
 
                 MYSQL_YYABORT;
-              sel->add_joined_table($$);
               lex->pop_context("derived");
               lex->nest_level--;
             }
@@ -11661,7 +11961,7 @@ table_primary_derived:
             lex->pop_select_and_context(); //push at the end of select_expr
             lex->derived_tables|= DERIVED_SUBQUERY;
             $3->linkage= DERIVED_TABLE_TYPE;
-            SELECT_LEX *sel= lex->select_stack.head();
+            SELECT_LEX *sel= lex->select_stack_head();
             SELECT_LEX_UNIT *unit=
               sel->attach_selects_chain($3, NULL);
             if(!unit)
@@ -11681,8 +11981,8 @@ table_primary_derived:
                                              ti, $6, 0,
                                              TL_READ, MDL_SHARED_READ)))
               MYSQL_YYABORT;
-            sel->add_joined_table($$);
-          } 
+          }
+/*
         | '('
           {
 
@@ -11700,7 +12000,9 @@ table_primary_derived:
               MYSQL_YYABORT;
             }
           }
+*/
         ;
+
 
 /*
   This rule accepts just about anything. The reason is that we have
@@ -16902,11 +17204,13 @@ global_select_on:
               fake->no_table_names_allowed= 1;
               lex->push_select_and_context(fake, thd->mem_root);
             }
+#if 0
             else if (sel->braces)
             {
               thd->parse_error(ER_SYNTAX_ERROR);
               MYSQL_YYABORT;
             }
+#endif
             else
             {
               lex->push_select_and_context(sel, thd->mem_root);
@@ -17031,7 +17335,7 @@ subselect:
               thd->parse_error();
               MYSQL_YYABORT;
             }
-            SELECT_LEX *sel= lex->select_stack.head();
+            SELECT_LEX *sel= lex->select_stack_head();
             SELECT_LEX_UNIT *unit=
               sel->attach_selects_chain($2, &sel->context);
             if(!unit)
@@ -17247,8 +17551,10 @@ view_select:
             lex->pop_select_and_context(); //push at the end of select_expr
             if ($3->set_nest_level(1))
               MYSQL_YYABORT;
+            SQL_I_List<TABLE_LIST> *save= &lex->first_select_lex()->table_list; 
             lex->unit.cut_subtree();
             lex->unit.rerister_selects_chain($3);
+            lex->first_select_lex()->table_list.push_front(save);
             if ($4)
               $4->set_to($3);
             lex->current_select= lex->first_select_lex();

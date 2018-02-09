@@ -8267,7 +8267,6 @@ bool st_select_lex::init_nested_join(THD *thd)
   nested_join= ptr->nested_join=
     ((NESTED_JOIN*) ((uchar*) ptr + ALIGN_SIZE(sizeof(TABLE_LIST))));
 
-  join_list->push_front(ptr, thd->mem_root);
   ptr->embedding= embedding;
   ptr->join_list= join_list;
   ptr->alias= (char*) "(nested_join)";
@@ -8373,7 +8372,6 @@ TABLE_LIST *st_select_lex::nest_last_join(THD *thd)
         ptr->join_using_fields= prev_join_using;
     }
   }
-  join_list->push_front(ptr, thd->mem_root);
   nested_join->used_tables= nested_join->not_null_tables= (table_map) 0;
   DBUG_RETURN(ptr);
 }
@@ -8989,7 +8987,7 @@ bool check_simple_select()
 {
   THD *thd= current_thd;
   LEX *lex= thd->lex;
-  if (lex->current_select != lex->first_select_lex())
+  if (lex->first_select_lex())
   {
     char command[80];
     Lex_input_stream *lip= & thd->m_parser_state->m_lip;

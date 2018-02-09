@@ -73,6 +73,14 @@ enum sub_select_type
   UNION_TYPE, INTERSECT_TYPE, EXCEPT_TYPE,
   GLOBAL_OPTIONS_TYPE, DERIVED_TABLE_TYPE, OLAP_TYPE
 };
+
+inline int cmp_unit_op(enum sub_select_type op1, enum sub_select_type op2)
+{
+  DBUG_ASSERT(op1 >= UNION_TYPE && op1 >= EXCEPT_TYPE);
+  DBUG_ASSERT(op2 >= UNION_TYPE && op2 >= EXCEPT_TYPE);
+  return (op1 == INTERSECT_TYPE ? 1 : 0) - (op1 == INTERSECT_TYPE ? 1 : 0);
+}
+
 enum unit_common_op {OP_MIX, OP_UNION, OP_INTERSECT, OP_EXCEPT};
 
 enum enum_view_suid
@@ -603,6 +611,7 @@ public:
     next= neighbour;
     neighbour->prev= &next;
   }
+  void cut_next() { next= NULL; }
   void include_standalone(st_select_lex_node *sel, st_select_lex_node **ref);
   void include_global(st_select_lex_node **plink);
   void exclude();
@@ -2799,7 +2808,9 @@ public:
     required a local context, the parser pops the top-most context.
   */
   List<Name_resolution_context> context_stack;
-  List<SELECT_LEX> select_stack;
+  List<SELECT_LEX> last_select_stack;
+  SELECT_LEX *select_stack[MAX_SELECT_NESTING];
+  uint select_stack_top;
 
   SQL_I_List<ORDER> proc_list;
   SQL_I_List<TABLE_LIST> auxiliary_table_list, save_list;
@@ -3164,43 +3175,78 @@ public:
     DBUG_VOID_RETURN;
   }
 
-  bool push_select(SELECT_LEX *select_lex, MEM_ROOT *mem_root)
+  bool push_new_select(SELECT_LEX *last);
+
+  SELECT_LEX *pop_new_select()
+  {
+    DBUG_ENTER("LEX::pop_select_new");
+    SELECT_LEX* last= last_select_stack.pop();
+    DBUG_PRINT("info", ("Pop last elect: %p (%d)",
+                         last, last->select_number));
+    DBUG_RETURN(last);
+  }
+
+  SELECT_LEX *select_stack_head()
+  {
+    if (likely(select_stack_top))
+      return select_stack[select_stack_top - 1];
+    return NULL;
+  }
+
+
+  bool push_select(SELECT_LEX *select_lex)
   {
     DBUG_ENTER("LEX::push_select");
-    DBUG_PRINT("info", ("Top Select was %p (%d) pushed: %p (%d)",
-                         select_stack.head(),
-                         (select_stack.head() ?
-                          select_stack.head()->select_number:
-                          0),
-                         select_lex, select_lex->select_number));
-    bool res= select_stack.push_front(select_lex, mem_root);
+    DBUG_PRINT("info", ("Top Select was %p (%d)  depth: %u  pushed: %p (%d)",
+                        select_stack_head(),
+                        select_stack_top,
+                        (select_stack_top ?
+                         select_stack_head()->select_number :
+                         0),
+                        select_lex, select_lex->select_number));
+    if (unlikely(select_stack_top == MAX_SELECT_NESTING))
+    {
+      my_error(ER_TOO_HIGH_LEVEL_OF_NESTING_FOR_SELECT, MYF(0));
+      DBUG_RETURN(TRUE);
+    }
+    select_stack[select_stack_top++]= select_lex;
     current_select= select_lex;
-    DBUG_RETURN(res);
+    DBUG_RETURN(FALSE);
   }
 
   SELECT_LEX *pop_select()
   {
     DBUG_ENTER("LEX::pop_select");
-    SELECT_LEX *select_lex= select_stack.pop();
+    SELECT_LEX *select_lex;
+    if (likely(select_stack_top))
+      select_lex= select_stack[--select_stack_top];
+    else
+      select_lex= 0;
+    DBUG_PRINT("info", ("Top Select is %p (%d)  depth: %u  poped: %p (%d)",
+                        select_stack_head(),
+                        select_stack_top,
+                        (select_stack_top ?
+                         select_stack_head()->select_number :
+                         0),
+                        select_lex,
+                        (select_lex ? select_lex->select_number : 0)));
     DBUG_ASSERT(select_lex);
-    DBUG_PRINT("info", ("Top Select is %p (%d) poped: %p (%d)",
-                         select_stack.head(),
-                         (select_stack.head() ?
-                          select_stack.head()->select_number:
-                          0),
-                         select_lex, select_lex->select_number));
-    if ((current_select= select_stack.head()) == NULL)
+
+    if (unlikely(!select_stack_top))
     {
       current_select= first_select_lex();
       DBUG_PRINT("info", ("Top Select is empty, current set to main"));
     }
+    else
+      current_select= select_stack[select_stack_top - 1];
+
     DBUG_RETURN(select_lex);
   }
 
   bool push_select_and_context(SELECT_LEX *sel, MEM_ROOT *mem_root)
   {
     DBUG_ENTER("LEX::push_select_and_context");
-    bool res= (push_select(sel, mem_root) ||
+    bool res= (push_select(sel) ||
                push_context(&sel->context, mem_root));
     DBUG_RETURN(res);
   }
@@ -3815,6 +3861,7 @@ public:
   void main_select_cut();
   bool new_main_select_anker(SELECT_LEX *sel);
   bool insert_select_hack(SELECT_LEX *sel);
+  SELECT_LEX *pop_new_select_and_wrap();
 };
 
 

@@ -4397,6 +4397,7 @@ public:
   TMP_TABLE_SHARE* save_tmp_table_share(TABLE *table);
   void restore_tmp_table_share(TMP_TABLE_SHARE *share);
 
+  bool inline is_main_lex(LEX *lex) { return lex == &main_lex; }
 private:
   /* Whether a lock has been acquired? */
   bool m_tmp_tables_locked;

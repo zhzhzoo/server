@@ -1349,8 +1349,6 @@ bool mysql_make_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *table,
       goto end;
 
     lex_start(thd);
-    view_select= lex->first_select_lex();
-    view_select->select_number= ++thd->select_number;
 
     sql_mode_t saved_mode= thd->variables.sql_mode;
     /* switch off modes which can prevent normal parsing of VIEW
@@ -1384,6 +1382,9 @@ bool mysql_make_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *table,
     /* Parse the query. */
 
     parse_status= parse_sql(thd, & parser_state, table->view_creation_ctx);
+
+    view_select= lex->first_select_lex();
+    //view_select->select_number= ++thd->select_number;
 
     lex->number_of_selects=
       (thd->select_number - view_select->select_number) + 1;
