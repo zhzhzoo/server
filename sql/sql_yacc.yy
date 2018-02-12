@@ -777,6 +777,16 @@ Virtual_column_info *add_virtual_expression(THD *thd, Item *expr)
     LEX_CSTRING name;
     uint offset;
   } sp_cursor_name_and_offset;
+  struct
+  {
+    enum sub_select_type unit_type;
+    bool distinct;
+  } unit_operation;
+  struct
+  {
+    SELECT_LEX *first;
+    SELECT_LEX *prev_last;
+  } select_list;
 
   /* pointers */
   Create_field *create_field;
@@ -869,7 +879,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 103 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 99
+%expect 102
 
 /*
    Comments for TOKENS.
@@ -4933,13 +4943,13 @@ create_select_query_expression:
 
             Lex->insert_select_hack(first_select);
 
-            if (lex->sql_command == SQLCOM_INSERT ||
-                lex->sql_command == SQLCOM_REPLACE)
+            if (Lex->sql_command == SQLCOM_INSERT ||
+                Lex->sql_command == SQLCOM_REPLACE)
             {
-              if (lex->sql_command == SQLCOM_INSERT)
-                lex->sql_command= SQLCOM_INSERT_SELECT;
+              if (Lex->sql_command == SQLCOM_INSERT)
+                Lex->sql_command= SQLCOM_INSERT_SELECT;
               else
-                lex->sql_command= SQLCOM_REPLACE_SELECT;
+                Lex->sql_command= SQLCOM_REPLACE_SELECT;
             }
         }
 
@@ -6336,12 +6346,12 @@ parenthesized_expr:
 
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(lex->current_select == curr_sel);
-            curr_sel->register_unit($1);
-            curr_sel->add_statictics($1);
+            DBUG_ASSERT(Lex->current_select == curr_sel);
+            curr_sel->register_unit($1, &curr_sel->context);
+            curr_sel->add_statistics($1);
 
-            $$= new (thd->mem_root) Item_singlerow_subselect(thd,
-                                                             $1.first_select());
+            $$= new (thd->mem_root)
+              Item_singlerow_subselect(thd, $1->first_select());
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
@@ -8816,9 +8826,9 @@ subselect:
 
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(lex->current_select == curr_sel);
-            curr_sel->register_unit($1);
-            curr_sel->add_statictics($1);
+            DBUG_ASSERT(Lex->current_select == curr_sel);
+            curr_sel->register_unit($1, &curr_sel->context);
+            curr_sel->add_statistics($1);
 
             $$= $1->first_select();
           }
@@ -8884,9 +8894,8 @@ select_option_list:
         ;
 
 select_option:
-/*          query_expression_option
-        |*/
-        SQL_NO_CACHE_SYM
+          query_expression_option
+        | SQL_NO_CACHE_SYM
           {
             /* 
               Allow this flag only on the first top-level SELECT statement, if
@@ -11405,11 +11414,11 @@ table_primary_derived:
 
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
-            DBUG_ASSERT(lex->current_select == curr_sel);
-            curr_sel->register_unit($2);
-            curr_sel->add_statictics($2);
+            DBUG_ASSERT(Lex->current_select == curr_sel);
+            curr_sel->register_unit($2, &curr_sel->context);
+            curr_sel->add_statistics($2);
 
-            Table_ident *ti= new (thd->mem_root) Table_ident(unit);
+            Table_ident *ti= new (thd->mem_root) Table_ident($2);
             if (ti == NULL)
               MYSQL_YYABORT;
             if (!($$= curr_sel->add_table_to_list(lex->thd,
@@ -16477,12 +16486,12 @@ view_select:
           {
             if ($2->set_nest_level(1))
               MYSQL_YYABORT;
-            SQL_I_List<TABLE_LIST> *save= &lex->first_select_lex()->table_list;
+            SQL_I_List<TABLE_LIST> *save= &Lex->first_select_lex()->table_list;
             Lex->set_main_unit($2);
-            lex->first_select_lex()->table_list.push_front(save);
-            lex->current_select= lex->first_select_lex();
-            lex->create_view->check= $3;
-            lex->parsing_options.allows_variable= TRUE;
+            Lex->first_select_lex()->table_list.push_front(save);
+            Lex->current_select= Lex->first_select_lex();
+            Lex->create_view->check= $3;
+            Lex->parsing_options.allows_variable= TRUE;
           }
         ;
 
