@@ -1711,15 +1711,12 @@ static my_bool translog_create_new_file()
   DBUG_PRINT("info", ("file_no: %lu", (ulong)file_no));
 
   if (translog_write_file_header())
-    DBUG_RETURN(1);
+    goto error;
 
   if (ma_control_file_write_and_force(last_checkpoint_lsn, file_no,
                                       max_trid_in_control_file,
                                       recovery_failures))
-  {
-    translog_stop_writing();
-    DBUG_RETURN(1);
-  }
+    goto error;
 
   DBUG_RETURN(0);
 
@@ -1759,10 +1756,6 @@ static void translog_buffer_lock(struct st_translog_buffer *buffer)
   SYNOPSIS
     translog_buffer_unlock()
     buffer               This buffer which should be unlocked
-
-  RETURN
-    0  OK
-    1  Error
 */
 
 static void translog_buffer_unlock(struct st_translog_buffer *buffer)
@@ -1956,7 +1949,10 @@ static void translog_finish_page(TRANSLOG_ADDRESS *horizon,
                        (ulong) cursor->buffer->size,
                        (ulong) (cursor->ptr -cursor->buffer->buffer),
                        (uint) cursor->current_page_fill, (uint) left));
-  DBUG_ASSERT(LSN_FILE_NO(*horizon) == LSN_FILE_NO(cursor->buffer->offset));
+  DBUG_ASSERT(LSN_FILE_NO(*horizon) == LSN_FILE_NO(cursor->buffer->offset)
+              || translog_status == TRANSLOG_UNINITED);
+  if ((LSN_FILE_NO(*horizon) != LSN_FILE_NO(cursor->buffer->offset)))
+    DBUG_VOID_RETURN; // everything wrong do not write to awoid more problems
   translog_check_cursor(cursor);
   if (cursor->protected)
   {
@@ -4857,8 +4853,10 @@ static my_bool translog_advance_pointer(int pages, uint16 last_page_data,
       translog_wait_for_buffer_free(new_buffer);
 #ifndef DBUG_OFF
       /* We keep the handler locked so nobody can start this new buffer */
-      DBUG_ASSERT(offset == new_buffer->offset && new_buffer->file == NULL &&
-                  (file == NULL ? ver : (uint8)(ver + 1)) == new_buffer->ver);
+      DBUG_ASSERT((offset == new_buffer->offset && new_buffer->file == NULL &&
+                   (file == NULL ? ver : (uint8)(ver + 1)) ==
+                    new_buffer->ver) ||
+                   translog_status == TRANSLOG_READONLY);
     }
 #endif
 
@@ -4892,9 +4890,9 @@ static my_bool translog_advance_pointer(int pages, uint16 last_page_data,
       if (translog_create_new_file())
       {
         struct st_translog_buffer *ob= log_descriptor.bc.buffer;
-        translog_buffer_lock(ob);
-        used_buffs_urgent_unlock(buffs);
         translog_buffer_unlock(ob);
+        used_buffs_urgent_unlock(buffs);
+        translog_buffer_lock(ob);
         DBUG_RETURN(1);
       }
     }
@@ -4973,7 +4971,9 @@ static void used_buffs_urgent_unlock(TRUNSLOG_USED_BUFFERS *buffs)
 {
   uint i;
   DBUG_ENTER("used_buffs_urgent_unlock");
+  translog_lock();
   translog_stop_writing();
+  translog_unlock();
   for (i= buffs->unlck_ptr; i < buffs->wrt_ptr; i++)
   {
     struct st_translog_buffer *buf= buffs->buff[i];
@@ -5123,6 +5123,11 @@ translog_write_variable_record_1group(LSN *lsn,
                                                         lsn, hook_arg)))
   {
     translog_unlock();
+    if (buffer_to_flush != NULL)
+    {
+      translog_buffer_flush(buffer_to_flush);
+      translog_buffer_unlock(buffer_to_flush);
+    }
     DBUG_RETURN(1);
   }
   cursor= log_descriptor.bc;
@@ -5285,7 +5290,8 @@ translog_write_variable_record_1chunk(LSN *lsn,
                                                         lsn, hook_arg)))
   {
     translog_unlock();
-    DBUG_RETURN(1);
+    rc= 1;
+    goto err;
   }
 
   rc= translog_write_parts_on_page(&log_descriptor.horizon,
@@ -5301,6 +5307,7 @@ translog_write_variable_record_1chunk(LSN *lsn,
      check if we switched buffer and need process it (current buffer is
      unlocked already => we will not delay other threads
   */
+err:
   if (buffer_to_flush != NULL)
   {
     if (!rc)
@@ -5652,6 +5659,11 @@ translog_write_variable_record_mgroup(LSN *lsn,
                             10, 10))
   {
     translog_unlock();
+    if (buffer_to_flush != NULL)
+    {
+      translog_buffer_flush(buffer_to_flush);
+      translog_buffer_unlock(buffer_to_flush);
+    }
     DBUG_PRINT("error", ("init array failed"));
     DBUG_RETURN(1);
   }
@@ -5718,9 +5730,7 @@ translog_write_variable_record_mgroup(LSN *lsn,
     if (buffer_to_flush != NULL)
     {
       if (!external_buffer_to_flush)
-      {
         translog_buffer_decrease_writers(buffer_to_flush);
-      }
       if (!rc)
         rc= translog_buffer_flush(buffer_to_flush);
       translog_buffer_unlock(buffer_to_flush);
@@ -5898,6 +5908,7 @@ translog_write_variable_record_mgroup(LSN *lsn,
 
   if (buffer_to_flush != NULL)
   {
+    DBUG_ASSERT(!external_buffer_to_flush);
     translog_buffer_decrease_writers(buffer_to_flush);
     if (!rc)
       rc= translog_buffer_flush(buffer_to_flush);
@@ -6087,7 +6098,8 @@ err:
   if (buffer_to_flush != NULL)
   {
     /* This is to prevent locking buffer forever in case of error */
-    translog_buffer_decrease_writers(buffer_to_flush);
+    if (!external_buffer_to_flush)
+      translog_buffer_decrease_writers(buffer_to_flush);
     if (!rc)
       rc= translog_buffer_flush(buffer_to_flush);
     translog_buffer_unlock(buffer_to_flush);
@@ -7642,7 +7654,8 @@ static void translog_force_current_buffer_to_finish()
 
   DBUG_ASSERT(log_descriptor.bc.ptr !=NULL);
   DBUG_ASSERT(LSN_FILE_NO(log_descriptor.horizon) ==
-              LSN_FILE_NO(old_buffer->offset));
+              LSN_FILE_NO(old_buffer->offset) ||
+              translog_status == TRANSLOG_READONLY );
   translog_check_cursor(&log_descriptor.bc);
   DBUG_ASSERT(left < TRANSLOG_PAGE_SIZE);
   if (left)
