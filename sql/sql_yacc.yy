@@ -4939,7 +4939,6 @@ create_select_query_expression:
               MYSQL_YYABORT;
 
             SELECT_LEX *first_select= $1->first_select();
-            Lex->set_main_unit($1);
 
             Lex->insert_select_hack(first_select);
 

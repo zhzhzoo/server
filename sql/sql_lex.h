@@ -616,6 +616,16 @@ public:
   void include_global(st_select_lex_node **plink);
   void exclude();
   void exclude_from_tree();
+  void exclude_from_global()
+  {
+    if (!link_prev)
+      return;
+    if (((*link_prev)= link_next))
+      link_next->link_prev= link_prev;
+    link_next= NULL;
+    link_prev= NULL;
+  }
+
 
   void set_slave(st_select_lex_node *slave_arg) { slave= slave_arg; }
   void move_node(st_select_lex_node *where_to_move)
@@ -3871,6 +3881,8 @@ public:
     unit= *u;
     unit.register_select_chain(u->first_select());
     unit.first_select()->options|= builtin_select.options;
+
+    builtin_select.exclude_from_global();
   }
 };
 

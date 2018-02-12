@@ -2361,9 +2361,7 @@ void st_select_lex_node::fast_exclude()
   // Remove slave structure
   for (; slave; slave= slave->next)
     slave->fast_exclude();
-  
 }
-
 
 /**
   @brief
@@ -7885,8 +7883,7 @@ bool LEX::insert_select_hack(SELECT_LEX *sel)
     builtin_select.link_prev= NULL; // indicator of removal
   }
 
-  if (new_main_select_anker(sel))
-    DBUG_RETURN(TRUE);
+  set_main_unit(sel->master_unit());
 
   DBUG_ASSERT(builtin_select.table_list.elements == 1);
   TABLE_LIST *insert_table= builtin_select.table_list.first;
