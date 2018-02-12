@@ -5072,18 +5072,38 @@ SELECT_LEX *LEX::alloc_select(bool select)
 }
 
 SELECT_LEX_UNIT *
-SELECT_LEX::attach_selects_chain(SELECT_LEX *sel,
+LEX::create_unit(SELECT_LEX *first_sel)
+{
+  SELECT_LEX_UNIT *unit;
+  DBUG_ENTER("LEX::create_unit");
+
+  if (!(unit= alloc_unit()))
+    DBUG_RETURN(NULL);
+
+  unit->register_select_chain(first_sel);
+  if (first_sel->next_select())
+  {
+    unit->reset_distinct();
+    DBUG_ASSERT(!unit->fake_select_lex);
+    if (!unit->add_fake_select_lex(thd))
+      DBUG_RETURN(NULL);
+  }
+  DBUG_RETURN(unit);
+}
+
+SELECT_LEX_UNIT *
+SELECT_LEX::attach_selects_chain(SELECT_LEX *first_sel,
                                  Name_resolution_context *context)
 {
   SELECT_LEX_UNIT *unit;
-  DBUG_ENTER("SELECT_LEX::attach_selects_chain");
+  DBUG_ENTER("SELECT_LEX::attach_select_chain");
 
   if (!(unit= parent_lex->alloc_unit()))
     DBUG_RETURN(NULL);
 
-  unit->rerister_selects_chain(sel);
-  rerister_unit(unit, context);
-  if (sel->next_select())
+  unit->register_select_chain(first_sel);
+  register_unit(unit, context);
+  if (first_sel->next_select())
   {
     unit->reset_distinct();
     DBUG_ASSERT(!unit->fake_select_lex);
@@ -5094,6 +5114,75 @@ SELECT_LEX::attach_selects_chain(SELECT_LEX *sel,
   DBUG_RETURN(unit);
 }
 
+SELECT_LEX *
+LEX::wrap_unit_into_derived(SELECT_LEX_UNIT *unit)
+{
+  SELECT_LEX *wrapping_sel;
+  Table_ident *ti;
+  DBUG_ENTER("LEX::wrap_unit_into_derived");
+
+  if (!(wrapping_sel= alloc_select(TRUE)))
+    DBUG_RETURN(NULL);
+  Name_resolution_context *context= &wrapping_sel->context;
+  context->init();
+  wrapping_sel->automatic_brackets= FALSE;
+
+  wrapping_sel->register_unit(unit, context);
+
+  /* stuff dummy SELECT * FROM (...) */
+
+  if (push_select(wrapping_sel)) // for Items & TABLE_LIST
+    DBUG_RETURN(NULL);
+
+  /* add SELECT list*/
+  {
+    Item *item= new (thd->mem_root)
+      Item_field(thd, context, NULL, NULL, &star_clex_str);
+    if (item == NULL)
+      goto err;
+    if (add_item_to_list(thd, item))
+      goto err;
+    (wrapping_sel->with_wild)++;
+  }
+
+  unit->first_select()->set_linkage(DERIVED_TABLE_TYPE);
+
+  ti= new (thd->mem_root) Table_ident(unit);
+  if (ti == NULL)
+    goto err;
+  {
+    char buff[10];
+    TABLE_LIST *table_list;
+    LEX_CSTRING alias;
+    alias.length= my_snprintf(buff, sizeof(buff),
+                              "__%u", wrapping_sel->select_number);
+    alias.str= thd->strmake(buff, alias.length);
+    if (!alias.str)
+      goto err;
+
+    if (!(table_list= wrapping_sel->add_table_to_list(thd, ti, &alias,
+                                                      0, TL_READ,
+                                                      MDL_SHARED_READ)))
+      goto err;
+
+    context->resolve_in_table_list_only(table_list);
+    wrapping_sel->add_joined_table(table_list);
+  }
+
+  pop_select();
+
+  derived_tables|= DERIVED_SUBQUERY;
+
+  /* TODO: count from the other end */
+  if (wrapping_sel->set_nest_level(1))
+    DBUG_RETURN(NULL);
+
+  DBUG_RETURN(wrapping_sel);
+
+err:
+  pop_select();
+  DBUG_RETURN(NULL);
+}
 
 SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
 {
@@ -5101,21 +5190,19 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
   SELECT_LEX_UNIT *unit;
   Table_ident *ti;
   DBUG_ENTER("LEX::link_selects_chain_down");
-
+ 
   if (!(dummy_select= alloc_select(TRUE)))
-    DBUG_RETURN(NULL);
+     DBUG_RETURN(NULL);
   Name_resolution_context *context= &dummy_select->context;
-  context->init();
   dummy_select->automatic_brackets= FALSE;
-
+ 
   if (!(unit= dummy_select->attach_selects_chain(sel, context)))
     DBUG_RETURN(NULL);
-
+ 
   /* stuff dummy SELECT * FROM (...) */
-
+ 
   if (push_select(dummy_select)) // for Items & TABLE_LIST
-    DBUG_RETURN(NULL);
-
+    DBUG_RETURN(NULL); 
 
   /* add SELECT list*/
   {
@@ -5127,9 +5214,9 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
       goto err;
     (dummy_select->with_wild)++;
   }
-
+ 
   sel->set_linkage(DERIVED_TABLE_TYPE);
-
+ 
   ti= new (thd->mem_root) Table_ident(unit);
   if (ti == NULL)
     goto err;
@@ -5142,31 +5229,30 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
     alias.str= thd->strmake(buff, alias.length);
     if (!alias.str)
       goto err;
-
+ 
     if (!(table_list= dummy_select->add_table_to_list(thd, ti, &alias,
                                                       0, TL_READ,
                                                       MDL_SHARED_READ)))
       goto err;
-
+ 
     context->resolve_in_table_list_only(table_list);
     dummy_select->add_joined_table(table_list);
   }
-
+ 
   pop_select();
 
   derived_tables|= DERIVED_SUBQUERY;
-
-  /* TODO: count from the other end */
+ 
+   /* TODO: count from the other end */
   if (dummy_select->set_nest_level(1))
-    DBUG_RETURN(NULL);
-
+     DBUG_RETURN(NULL);
+ 
   DBUG_RETURN(dummy_select);
-
+ 
 err:
   pop_select();
   DBUG_RETURN(NULL);
 }
-
 
 SELECT_LEX *LEX::push_selects_down(SELECT_LEX *exclude_start,
                                    SELECT_LEX *exclude_end, bool automatic)
@@ -7662,11 +7748,11 @@ void st_select_lex_unit::fix_distinct(st_select_lex_unit *new_unit)
 }
 
 
-void st_select_lex_unit::rerister_selects_chain(SELECT_LEX *sel)
+void st_select_lex_unit::register_select_chain(SELECT_LEX *first_sel)
 {
-  DBUG_ASSERT(sel != 0);
-  slave= sel;
-  for(;sel; sel= sel->next_select())
+  DBUG_ASSERT(first_sel != 0);
+  slave= first_sel;
+  for(SELECT_LEX *sel=first_sel; sel; sel= sel->next_select())
   {
     sel->master= (st_select_lex_node *)this;
     uncacheable|= sel->uncacheable;
@@ -7674,7 +7760,7 @@ void st_select_lex_unit::rerister_selects_chain(SELECT_LEX *sel)
 }
 
 
-void st_select_lex::rerister_unit(SELECT_LEX_UNIT *unit,
+void st_select_lex::register_unit(SELECT_LEX_UNIT *unit,
                                   Name_resolution_context *outer_context)
 {
   if ((unit->next= slave))
@@ -7714,7 +7800,7 @@ bool LEX::new_main_select_anker(SELECT_LEX *sel)
   DBUG_ENTER("LEX::new_main_select_anker");
   if (sel->set_nest_level(1))
     DBUG_RETURN(TRUE);
-  unit.rerister_selects_chain(sel);
+  unit.register_select_chain(sel);
   sel->options|= builtin_select.options;
 
   DBUG_RETURN(FALSE);

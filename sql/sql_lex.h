@@ -76,9 +76,9 @@ enum sub_select_type
 
 inline int cmp_unit_op(enum sub_select_type op1, enum sub_select_type op2)
 {
-  DBUG_ASSERT(op1 >= UNION_TYPE && op1 >= EXCEPT_TYPE);
-  DBUG_ASSERT(op2 >= UNION_TYPE && op2 >= EXCEPT_TYPE);
-  return (op1 == INTERSECT_TYPE ? 1 : 0) - (op1 == INTERSECT_TYPE ? 1 : 0);
+  DBUG_ASSERT(op1 >= UNION_TYPE && op1 <= EXCEPT_TYPE);
+  DBUG_ASSERT(op2 >= UNION_TYPE && op2 <= EXCEPT_TYPE);
+  return (op1 == INTERSECT_TYPE ? 1 : 0) - (op2 == INTERSECT_TYPE ? 1 : 0);
 }
 
 enum unit_common_op {OP_MIX, OP_UNION, OP_INTERSECT, OP_EXCEPT};
@@ -838,7 +838,7 @@ public:
   void reset_distinct();
   void fix_distinct(st_select_lex_unit *new_unit);
 
-  void rerister_selects_chain(SELECT_LEX *sel);
+  void register_select_chain(SELECT_LEX *first_sel);
 
   bool set_nest_level(int new_nest_level);
 
@@ -1315,7 +1315,7 @@ public:
     DBUG_PRINT("info", ("Select #%d", select_number));
     DBUG_VOID_RETURN;
   }
-  void rerister_unit(SELECT_LEX_UNIT *unit,
+  void register_unit(SELECT_LEX_UNIT *unit,
                      Name_resolution_context *outer_context);
   SELECT_LEX_UNIT *attach_selects_chain(SELECT_LEX *sel,
                                         Name_resolution_context *context);
@@ -3856,6 +3856,8 @@ public:
 
   SELECT_LEX_UNIT *alloc_unit();
   SELECT_LEX *alloc_select(bool is_select);
+  SELECT_LEX_UNIT *create_unit(SELECT_LEX*);
+  SELECT_LEX *wrap_unit_into_derived(SELECT_LEX_UNIT *unit);
   SELECT_LEX *link_selects_chain_down(SELECT_LEX *sel);
   bool main_select_push();
   void main_select_cut();

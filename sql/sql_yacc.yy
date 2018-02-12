@@ -834,6 +834,7 @@ Virtual_column_info *add_virtual_expression(THD *thd, Item *expr)
 
   handlerton *db_type;
   st_select_lex *select_lex;
+  st_select_lex_unit *select_lex_unit;
   struct p_elem_val *p_elem_value;
   class Window_frame *window_frame;
   class Window_frame_bound *window_frame_bound;
@@ -882,7 +883,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 103 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 94
+%expect 99
 
 /*
    Comments for TOKENS.
@@ -1848,9 +1849,13 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         query_specification_with_opt_tail_parens
         query_primary
         query_expression_unit_parens
+
+%type <select_lex_unit> 
         query_expression_unit_with_opt_parens
         query_expression_unit_with_opt_tail
         query_expression_unit_with_opt_tail_parens
+        query_expression_body
+        query_expression
 
 %type <select_list> query_expression_unit
 
@@ -4967,7 +4972,7 @@ create_select_query_expression:
             {
               lex->insert_select_hack($2);
               lex->unit.cut_subtree();
-              lex->unit.rerister_selects_chain($2);
+              lex->unit.register_select_chain($2);
             }
         }
 /*
@@ -8735,7 +8740,7 @@ query_specification:
          }
          select_options
          select_item_list
-         into
+         opt_into
          opt_from_clause
          opt_where_clause
          opt_group_clause
@@ -8744,6 +8749,7 @@ query_specification:
          {
            $$= Lex->pop_select();
          }
+/*
        | SELECT_SYM
          {
            SELECT_LEX *sel;
@@ -8761,6 +8767,7 @@ query_specification:
          {
            $$= Lex->pop_select();
          }
+*/
       ;
 
 opt_from_clause:
@@ -8807,19 +8814,23 @@ query_specification_with_opt_tail_parens:
        ;
 
 query_primary:
-       | query_specification_with_opt_parens
-          { $$= $1; }
+         query_specification_with_opt_parens
+         { $$= $1; }
        | query_specification_with_opt_tail_parens
-          { $$= $1; }
+         { $$= $1; }
        | query_expression_unit_with_opt_tail_parens
-          { $$= $1; }
+         { 
+           $$= Lex->wrap_unit_into_derived($1);
+           if ($$ == NULL)
+             YYABORT;
+         }        
        ;
 
 query_expression_unit_with_opt_tail_parens:
          '(' query_expression_unit_with_opt_tail_parens ')'
-          { $$= $1; }
+          { $$= $2; }
        | '(' query_expression_unit_with_opt_tail ')'
-          { $$= $1; }
+          { $$= $2; }
        ;
 
 query_expression_unit_with_opt_tail:
@@ -8828,22 +8839,21 @@ query_expression_unit_with_opt_tail:
          opt_limit_clause
          opt_select_lock_type
          {
-           Lex->pop_select(); //query_expression_unit_with_opt_parens put it
+           Lex->pop_select();
+           $$= $1;
          }
        ;
 
 query_expression_unit_with_opt_parens:
          query_expression_unit_parens
          {
-           $$.first= $1;
-           $$.prev_last= NULL;
-
-           // query_expression_unit_with_opt_tail  will pop it
-           Lex->push_slect($1);
+           $$= Lex->create_unit($1);
+           if ($$ == NULL)
+             YYABORT;
+           Lex->push_select($1);
          }
        | query_expression_unit
          {
-           SELECT_LEX *sel;
            SELECT_LEX *last= $1.prev_last->next_select();
            int cmp= cmp_unit_op($1.first->next_select()->linkage,
                                 last->linkage);
@@ -8852,12 +8862,10 @@ query_expression_unit_with_opt_parens:
              if (Lex->pop_new_select_and_wrap() == NULL)
                MYSQL_YYABORT;
            }
-           if (!(sel= lex->link_selects_chain_down($1.first)))
-              MYSQL_YYABORT;
-           $$= sel;
-
-           // query_expression_unit_with_opt_tail  will pop it
-           Lex->push_slect(sel->first_inner_unit()->fake_select);
+           $$= Lex->create_unit($1.first);
+           if ($$ == NULL)
+             YYABORT;
+           Lex->push_select($$->fake_select_lex);
          }
        ;
 
@@ -8876,7 +8884,7 @@ query_expression_unit_parens:
                MYSQL_YYABORT;
            }
 
-           if (!(sel= lex->link_selects_chain_down($2.first)))
+           if (!(sel= Lex->link_selects_chain_down($2.first)))
               MYSQL_YYABORT;
            $$= sel;
          }
@@ -8887,12 +8895,6 @@ query_expression_unit:
          unit_type_decl
          query_primary
          {
-           // take pre last SELECT from stack, link last to it and leave the
-           // last
-           //if (Lex->Link_2_stack_top($2))
-           //   YYABORT;
-
-           //Lex->link_select($1, $3, $2);
            $1->link_neighbour($3);
            $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
            $$.first= $1;
@@ -8902,15 +8904,6 @@ query_expression_unit:
          unit_type_decl
          query_primary
          {
-           /*
-           if priority(query_primary) > priority(query_expression_body)
-             pop from stack; add sel for popped; push to stack
-           end if
-           add sel for query primary
-           */
-           //if (Lex->Link_2_stack_top($2))
-           //   YYABORT;
-           SELECT_LEX *sel;
            SELECT_LEX *last= $1.prev_last->next_select();
            int cmp= cmp_unit_op($3->linkage, last->linkage);
            if (cmp == 0)
@@ -8937,6 +8930,40 @@ query_expression_unit:
          }
        ;
 
+query_expression_body:
+         query_primary
+         { 
+           $$= Lex->create_unit($1);
+           if ($$ == NULL)
+             YYABORT;
+         }
+       | query_expression_unit_with_opt_tail { $$= $1; }
+       ;
+
+query_expression:
+         opt_with_clause
+         query_expression_body
+          {
+            if ($1)
+             $2->set_with_clause($1);
+            $$= $2;
+          }
+        ;
+
+subselect:
+          query_expression
+          {
+            if (!Lex->expr_allows_subselect ||
+                Lex->sql_command == (int)SQLCOM_PURGE)
+            {
+              thd->parse_error();
+              MYSQL_YYABORT;
+            }
+            /* Collect statistics ... */
+            $$= $1->first_select();
+          }
+        ;
+         
 /* Chain of selects on top (have to be linked under unit */
 select_expr:
           select_term unit_type_decl select_expr 
@@ -13052,6 +13079,10 @@ select_outvar:
           }
         ;
 
+opt_into:
+          /* empty */
+        | into
+        ;
 into:
           INTO into_destination
         ;
@@ -15035,7 +15066,7 @@ opt_with_clause:
 
 
 with_clause:
-        WITH opt_recursive
+          WITH opt_recursive
           {
              With_clause *with_clause=
              new With_clause($2, Lex->curr_with_clause);
@@ -15045,7 +15076,7 @@ with_clause:
              Lex->curr_with_clause= with_clause;
              with_clause->add_to_list(Lex->with_clauses_list_last_next);
           }
-        with_list
+          with_list
           {
             $$= Lex->curr_with_clause;
             Lex->curr_with_clause= Lex->curr_with_clause->pop();
@@ -17285,23 +17316,6 @@ union_option:
         ;
 
 /*
-  Corresponds to the SQL Standard
-  <query specification> ::=
-    SELECT [ <set quantifier> ] <select list> <table expression>
-
-  Notes:
-  - We allow more options in addition to <set quantifier>
-  - <table expression> is optional in MariaDB
-*/
-/*
-query_specification:
-          SELECT_SYM select_init2_derived opt_table_expression
-          {
-            $$= Lex->current_select->master_unit()->first_select();
-          }
-        ;
-*/
-/*
 query_term_union_not_ready:
           query_specification order_or_limit opt_select_lock_type { $$= $1; }
         | '(' select_paren_derived ')' union_order_or_limit       { $$= $2; }
@@ -17313,110 +17327,8 @@ query_term_union_ready:
           query_specification opt_select_lock_type                { $$= $1; }
         | '(' select_paren_derived ')'                            { $$= $2; }
         ;
-
-query_expression_body:
-          query_term_union_not_ready                                { $$= $1; }
-        | query_term_union_ready                                    { $$= $1; }
-        | query_term_union_ready union_list_derived                 { $$= $1; }
-        ;
 */
 
-/* Corresponds to <query expression> in the SQL:2003 standard. */
-subselect:
-          opt_with_clause
-          select_expr
-          select_dedicated_tail
-          {
-            LEX *lex=Lex;
-            lex->pop_select_and_context(); //push at the end of select_expr
-            if (!lex->expr_allows_subselect ||
-               lex->sql_command == (int)SQLCOM_PURGE)
-            {
-              thd->parse_error();
-              MYSQL_YYABORT;
-            }
-            SELECT_LEX *sel= lex->select_stack_head();
-            SELECT_LEX_UNIT *unit=
-              sel->attach_selects_chain($2, &sel->context);
-            if(!unit)
-              MYSQL_YYABORT;
-            if (unit->set_nest_level(sel->nest_level + 1))
-              MYSQL_YYABORT;
-            if ($1)
-              $2->set_with_clause($1);
-            $$= $2;
-            for (SELECT_LEX *child= $2; child; child= child->next_select())
-            {
-              /*
-                A subselect can add fields to an outer select.
-                Reserve space for them.
-              */
-              sel->select_n_where_fields+=
-              child->select_n_where_fields;
-              /*
-                Aggregate functions in having clause may add fields
-                to an outer select. Count them also.
-              */
-              sel->select_n_having_items+= child->select_n_having_items;
-            }
-            //Lex->current_select= sel->master_unit()->outer_select();
-          }
-        ;
-
-/*
-subselect_start:
-          {
-            LEX *lex=Lex;
-            if (!lex->expr_allows_subselect ||
-               lex->sql_command == (int)SQLCOM_PURGE)
-            {
-              thd->parse_error();
-              MYSQL_YYABORT;
-            }
-*/
-            /* 
-              we are making a "derived table" for the parenthesis
-              as we need to have a lex level to fit the union 
-              after the parenthesis, e.g. 
-              (SELECT .. ) UNION ...  becomes 
-              SELECT * FROM ((SELECT ...) UNION ...)
-            */
-/*
-            //if (mysql_new_select(Lex, 1, NULL))
-            //  MYSQL_YYABORT;
-          }
-        ;
-
-
-subselect_end:
-          {
-            LEX *lex=Lex;
-
-            lex->check_automatic_up(UNSPECIFIED_TYPE);
-            //lex->pop_context();
-            SELECT_LEX *child= lex->current_select;
-            lex->current_select = lex->current_select->return_after_parsing();
-            lex->nest_level--;
-            lex->current_select->n_child_sum_items += child->n_sum_items;
-*/
-            /*
-              A subselect can add fields to an outer select. Reserve space for
-              them.
-            */
-/*
-            lex->current_select->select_n_where_fields+=
-            child->select_n_where_fields;
-*/
-            /*
-              Aggregate functions in having clause may add fields to an outer
-              select. Count them also.
-            */
-/*
-            lex->current_select->select_n_having_items+=
-            child->select_n_having_items;
-          }
-        ;
-*/
 /*
 opt_query_expression_options:
 */
@@ -17553,7 +17465,7 @@ view_select:
               MYSQL_YYABORT;
             SQL_I_List<TABLE_LIST> *save= &lex->first_select_lex()->table_list; 
             lex->unit.cut_subtree();
-            lex->unit.rerister_selects_chain($3);
+            lex->unit.register_select_chain($3);
             lex->first_select_lex()->table_list.push_front(save);
             if ($4)
               $4->set_to($3);
