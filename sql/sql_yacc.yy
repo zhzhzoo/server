@@ -8617,8 +8617,9 @@ query_specification:
          {
            SELECT_LEX *sel;
            if (!(sel= Lex->alloc_select(TRUE)) ||
-               Lex->push_select(sel))
+                 Lex->push_select(sel))
              MYSQL_YYABORT;
+           mysql_init_select(Lex);
          }
          select_options
          select_item_list
