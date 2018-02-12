@@ -702,7 +702,6 @@ public:
   {
   }
 
-
   TABLE *table; /* temporary table using for appending UNION results */
   select_result *result;
   bool  prepared, // prepare phase already performed for UNION (unit)
@@ -1319,6 +1318,7 @@ public:
                      Name_resolution_context *outer_context);
   SELECT_LEX_UNIT *attach_selects_chain(SELECT_LEX *sel,
                                         Name_resolution_context *context);
+  void add_statistics(SELECT_LEX_UNIT *unit);
 };
 typedef class st_select_lex SELECT_LEX;
 
@@ -3864,6 +3864,14 @@ public:
   bool new_main_select_anker(SELECT_LEX *sel);
   bool insert_select_hack(SELECT_LEX *sel);
   SELECT_LEX *pop_new_select_and_wrap();
+
+  void set_main_unit(st_select_lex_unit *u)
+  {
+    // ??? maybe have reference in LEX
+    unit= *u;
+    unit.register_select_chain(u->first_select());
+    unit.first_select()->options|= builtin_select.options;
+  }
 };
 
 

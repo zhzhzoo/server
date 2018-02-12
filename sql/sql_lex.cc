@@ -5190,19 +5190,19 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
   SELECT_LEX_UNIT *unit;
   Table_ident *ti;
   DBUG_ENTER("LEX::link_selects_chain_down");
- 
+
   if (!(dummy_select= alloc_select(TRUE)))
      DBUG_RETURN(NULL);
   Name_resolution_context *context= &dummy_select->context;
   dummy_select->automatic_brackets= FALSE;
- 
+
   if (!(unit= dummy_select->attach_selects_chain(sel, context)))
     DBUG_RETURN(NULL);
- 
+
   /* stuff dummy SELECT * FROM (...) */
- 
+
   if (push_select(dummy_select)) // for Items & TABLE_LIST
-    DBUG_RETURN(NULL); 
+    DBUG_RETURN(NULL);
 
   /* add SELECT list*/
   {
@@ -5214,9 +5214,9 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
       goto err;
     (dummy_select->with_wild)++;
   }
- 
+
   sel->set_linkage(DERIVED_TABLE_TYPE);
- 
+
   ti= new (thd->mem_root) Table_ident(unit);
   if (ti == NULL)
     goto err;
@@ -5229,26 +5229,26 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
     alias.str= thd->strmake(buff, alias.length);
     if (!alias.str)
       goto err;
- 
+
     if (!(table_list= dummy_select->add_table_to_list(thd, ti, &alias,
                                                       0, TL_READ,
                                                       MDL_SHARED_READ)))
       goto err;
- 
+
     context->resolve_in_table_list_only(table_list);
     dummy_select->add_joined_table(table_list);
   }
- 
+
   pop_select();
 
   derived_tables|= DERIVED_SUBQUERY;
- 
+
    /* TODO: count from the other end */
   if (dummy_select->set_nest_level(1))
      DBUG_RETURN(NULL);
- 
+
   DBUG_RETURN(dummy_select);
- 
+
 err:
   pop_select();
   DBUG_RETURN(NULL);
@@ -7775,6 +7775,30 @@ void st_select_lex::register_unit(SELECT_LEX_UNIT *unit,
     sel->context.outer_context= &context;
   }
 }
+
+
+void st_select_lex::add_statistics(SELECT_LEX_UNIT *unit)
+{
+  for (;
+       unit;
+       unit= unit->next_unit())
+    for(SELECT_LEX *child= unit->first_select();
+        child;
+        child= child->next_select())
+    {
+      /*
+        A subselect can add fields to an outer select.
+        Reserve space for them.
+      */
+      select_n_where_fields+= child->select_n_where_fields;
+      /*
+        Aggregate functions in having clause may add fields
+        to an outer select. Count them also.
+      */
+      select_n_having_items+= child->select_n_having_items;
+    }
+}
+
 
 bool LEX::main_select_push()
 {
