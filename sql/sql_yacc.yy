@@ -8602,7 +8602,15 @@ select_new:
             if ($1->set_nest_level(1))
               MYSQL_YYABORT;
             Lex->set_main_unit($1);
-            Lex->push_select(Lex->first_select_lex());
+
+            SELECT_LEX *fake= Lex->unit.fake_select_lex;
+            if (fake)
+            {
+              fake->no_table_names_allowed= 1;
+              Lex->push_select(fake);
+            }
+            else
+              Lex->push_select(Lex->first_select_lex());
           }
           select_new_global_tail
           {
@@ -8838,11 +8846,12 @@ subselect:
 
 select_new_global_tail:
           /* empty */
-        | global_select_on procedure_clause global_select_off
-        | global_select_on global_order_or_limit opt_select_lock_type procedure_clause global_select_off
-        | global_select_on global_order_or_limit opt_select_lock_type global_select_off
-        | global_select_on into opt_table_expression opt_order_clause opt_limit_clause opt_select_lock_type global_select_off
-        | global_select_on global_order_or_limit opt_select_lock_type into global_select_off
+        | procedure_clause
+        | global_order_or_limit opt_select_lock_type procedure_clause
+        | global_order_or_limit opt_select_lock_type
+        | into opt_table_expression opt_order_clause opt_limit_clause opt_select_lock_type
+        | global_order_or_limit opt_select_lock_type into
+        ;
 
 
 /**
@@ -11168,7 +11177,7 @@ join_table:
           {
 	    $3->straight=$2;
             add_join_on(thd, $3, $6);
-            Lex->pop_context("ON normal join");
+            Lex->pop_context();
             Select->parsing_place= NO_MATTER;
           }
         | table_ref normal_join table_ref
@@ -11208,7 +11217,7 @@ join_table:
           expr
           {
             add_join_on(thd, $5, $8);
-            Lex->pop_context("ON left join");
+            Lex->pop_context();
             $5->outer_join|=JOIN_TYPE_LEFT;
             $$=$5;
             Select->parsing_place= NO_MATTER;
@@ -11253,7 +11262,7 @@ join_table:
             if (!($$= lex->current_select->convert_right_join()))
               MYSQL_YYABORT;
             add_join_on(thd, $$, $8);
-            Lex->pop_context("ON right join");
+            Lex->pop_context();
             Select->parsing_place= NO_MATTER;
           }
         | table_ref RIGHT opt_outer JOIN_SYM table_factor
@@ -16306,42 +16315,6 @@ unit_type_decl:
           { $$.unit_type= INTERSECT_TYPE; $$.distinct= 1; }
         | EXCEPT_SYM
           { $$.unit_type= EXCEPT_TYPE; $$.distinct= 1; }
-
-
-global_select_on:
-          {
-            LEX *lex= thd->lex;
-            SELECT_LEX *sel= lex->first_select_lex();
-            SELECT_LEX_UNIT *unit= sel->master_unit();
-            SELECT_LEX *fake= unit->fake_select_lex;
-            if (fake)
-            {
-              fake->no_table_names_allowed= 1;
-              lex->push_select_and_context(fake, thd->mem_root);
-            }
-#if 0
-            else if (sel->braces)
-            {
-              thd->parse_error(ER_SYNTAX_ERROR);
-              MYSQL_YYABORT;
-            }
-#endif
-            else
-            {
-              lex->push_select_and_context(sel, thd->mem_root);
-            }
-            DBUG_ASSERT(lex->current_select->linkage != GLOBAL_OPTIONS_TYPE);
-          }
-      ; 
-
-global_select_off:
-          {
-            SELECT_LEX *sel;
-            if ((sel= Lex->pop_select_and_context()))
-              sel->no_table_names_allowed= 0;
-
-          }
-        ;
 
 
 global_order_or_limit:

@@ -3159,25 +3159,13 @@ public:
 
   void cleanup_after_one_table_open();
 
-  bool push_context(Name_resolution_context *context, MEM_ROOT *mem_root)
-  {
-    DBUG_ENTER("LEX::push_context");
-    DBUG_PRINT("info", ("Context: %p Select: %p (%d)",
-                         context, context->select_lex,
-                         (context->select_lex ?
-                          context->select_lex->select_number:
-                          0)));
-    bool res= context_stack.push_front(context, mem_root);
-    DBUG_RETURN(res);
-  }
+  bool push_context(Name_resolution_context *context);
 
-  void pop_context(const char *str)
+  void pop_context()
   {
     DBUG_ENTER("LEX::pop_context");
-    DBUG_PRINT("info", ("Context: '%s'", str));
     Name_resolution_context *context= context_stack.pop();
-    DBUG_PRINT("info", ("Context: '%s' %p Select: %p (%d)",
-                         str,
+    DBUG_PRINT("info", ("Pop context %p Select: %p (%d)",
                          context, context->select_lex,
                          (context->select_lex ?
                           context->select_lex->select_number:
@@ -3219,6 +3207,8 @@ public:
       my_error(ER_TOO_HIGH_LEVEL_OF_NESTING_FOR_SELECT, MYF(0));
       DBUG_RETURN(TRUE);
     }
+    if (push_context(&select_lex->context))
+      DBUG_RETURN(TRUE);
     select_stack[select_stack_top++]= select_lex;
     current_select= select_lex;
     DBUG_RETURN(FALSE);
@@ -3242,31 +3232,17 @@ public:
                         (select_lex ? select_lex->select_number : 0)));
     DBUG_ASSERT(select_lex);
 
+    pop_context();
+
     if (unlikely(!select_stack_top))
     {
-      current_select= first_select_lex();
-      DBUG_PRINT("info", ("Top Select is empty, current set to main"));
+      current_select= NULL;
+      DBUG_PRINT("info", ("Top Select is empty"));
     }
     else
       current_select= select_stack[select_stack_top - 1];
 
     DBUG_RETURN(select_lex);
-  }
-
-  bool push_select_and_context(SELECT_LEX *sel, MEM_ROOT *mem_root)
-  {
-    DBUG_ENTER("LEX::push_select_and_context");
-    bool res= (push_select(sel) ||
-               push_context(&sel->context, mem_root));
-    DBUG_RETURN(res);
-  }
-
-  SELECT_LEX *pop_select_and_context()
-  {
-    DBUG_ENTER("LEX::pop_select_and_context");
-    pop_context("Tail of select");
-    SELECT_LEX *res= pop_select();
-    DBUG_RETURN(res);
   }
 
   bool copy_db_to(const char **p_db, size_t *p_db_length) const;

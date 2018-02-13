@@ -8596,7 +8596,7 @@ bool st_select_lex_unit::add_fake_select_lex(THD *thd_arg)
     fake_select_lex->no_table_names_allowed= 1;
     thd_arg->lex->current_select= fake_select_lex;
   }
-  thd_arg->lex->pop_context("add fake");
+  //thd_arg->lex->pop_context("add fake");
   DBUG_RETURN(0);
 }
 
@@ -8632,7 +8632,7 @@ push_new_name_resolution_context(THD *thd,
     left_op->first_leaf_for_name_resolution();
   on_context->last_name_resolution_table=
     right_op->last_leaf_for_name_resolution();
-  return thd->lex->push_context(on_context, thd->mem_root);
+  return thd->lex->push_context(on_context);
 }
 
 

@@ -11016,7 +11016,7 @@ join_table:
           {
 	    $3->straight=$2;
             add_join_on(thd, $3, $6);
-            Lex->pop_context("ON normal");
+            Lex->pop_context();
             Select->parsing_place= NO_MATTER;
           }
         | table_ref normal_join table_ref
@@ -11050,7 +11050,7 @@ join_table:
           expr
           {
             add_join_on(thd, $5, $8);
-            Lex->pop_context("ON left");
+            Lex->pop_context();
             $5->outer_join|=JOIN_TYPE_LEFT;
             $$=$5;
             Select->parsing_place= NO_MATTER;
@@ -11089,7 +11089,7 @@ join_table:
             if (!($$= lex->current_select->convert_right_join()))
               MYSQL_YYABORT;
             add_join_on(thd, $$, $8);
-            Lex->pop_context("ON right");
+            Lex->pop_context();
             Select->parsing_place= NO_MATTER;
           }
         | table_ref RIGHT opt_outer JOIN_SYM table_factor
@@ -11223,7 +11223,7 @@ table_primary_derived:
 
                 MYSQL_YYABORT;
               sel->add_joined_table($$);
-              lex->pop_context("derived");
+              //lex->pop_context("derived");
               lex->nest_level--;
             }
             else if ($5 != NULL)
@@ -11316,9 +11316,9 @@ select_derived_union:
        ;
 
 union_list_derived_part2:
-         query_term_union_not_ready { Lex->pop_context("u1"); }
-       | query_term_union_ready     { Lex->pop_context("u2"); }
-       | query_term_union_ready     { Lex->pop_context("u3"); } union_list_derived
+         query_term_union_not_ready { Lex->pop_context(); }
+       | query_term_union_ready     { Lex->pop_context(); }
+       | query_term_union_ready     { Lex->pop_context(); } union_list_derived
        ;
 
 union_list_derived:
@@ -16420,7 +16420,7 @@ union_list:
               Remove from the name resolution context stack the context of the
               last select in the union.
             */
-            Lex->pop_context("union list");
+            Lex->pop_context();
           }
         ;
 
@@ -16432,7 +16432,7 @@ union_list_view:
           }
           query_expression_body_view
           {
-            Lex->pop_context("union view");
+            Lex->pop_context();
           }
         ;
 
@@ -16546,7 +16546,7 @@ subselect_end:
             LEX *lex=Lex;
 
             lex->check_automatic_up(UNSPECIFIED_TYPE);
-            lex->pop_context("subselect end");
+            lex->pop_context();
             SELECT_LEX *child= lex->current_select;
             lex->current_select = lex->current_select->return_after_parsing();
             lex->nest_level--;

@@ -2208,7 +2208,7 @@ void st_select_lex::init_query()
     thus push_context should be moved to a place where query
     initialization is checked for failure.
   */
-  parent_lex->push_context(&context, parent_lex->thd->mem_root);
+  //parent_lex->push_context(&context, parent_lex->thd->mem_ro:ot);
   cond_count= between_count= with_wild= 0;
   max_equal_elems= 0;
   ref_pointer_array.reset();
@@ -5471,6 +5471,19 @@ bool LEX::make_select_in_brackets(SELECT_LEX* dummy_select,
   //current_select->nest_level++;
   DBUG_RETURN(FALSE);
 }
+
+bool LEX::push_context(Name_resolution_context *context)
+{
+  DBUG_ENTER("LEX::push_context");
+  DBUG_PRINT("info", ("Context: %p Select: %p (%d)",
+                       context, context->select_lex,
+                       (context->select_lex ?
+                        context->select_lex->select_number:
+                        0)));
+  bool res= context_stack.push_front(context, thd->mem_root);
+  DBUG_RETURN(res);
+}
+
 
 bool LEX::push_new_select(SELECT_LEX *last)
 {
