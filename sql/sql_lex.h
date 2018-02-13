@@ -3853,8 +3853,8 @@ public:
 
   void set_main_unit(st_select_lex_unit *u)
   {
-    // ??? maybe have reference in LEX
-    unit= *u;
+    unit.options= u->options;
+    unit.uncacheable= u->uncacheable;
     unit.register_select_chain(u->first_select());
     unit.first_select()->options|= builtin_select.options;
 
