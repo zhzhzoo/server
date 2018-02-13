@@ -5083,7 +5083,7 @@ LEX::create_unit(SELECT_LEX *first_sel)
   {
     unit->reset_distinct();
     DBUG_ASSERT(!unit->fake_select_lex);
-    if (!unit->add_fake_select_lex(thd))
+    if (unit->add_fake_select_lex(thd))
       DBUG_RETURN(NULL);
   }
   DBUG_RETURN(unit);
