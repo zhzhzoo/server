@@ -13426,7 +13426,7 @@ describe:
           explainable_command
           {
             LEX *lex=Lex;
-            lex->builtin_select.options|= SELECT_DESCRIBE;
+            lex->first_select_lex()->options|= SELECT_DESCRIBE;
           }
         ;
 

@@ -3845,7 +3845,6 @@ public:
   SELECT_LEX *wrap_unit_into_derived(SELECT_LEX_UNIT *unit);
   SELECT_LEX *link_selects_chain_down(SELECT_LEX *sel);
   bool main_select_push();
-  void main_select_cut();
   bool new_main_select_anker(SELECT_LEX *sel);
   bool insert_select_hack(SELECT_LEX *sel);
   SELECT_LEX *pop_new_select_and_wrap();

@@ -7769,20 +7769,10 @@ void st_select_lex::add_statistics(SELECT_LEX_UNIT *unit)
 bool LEX::main_select_push()
 {
   DBUG_ENTER("LEX::main_select_push");
+  thd->select_number= 1;
   if (push_select(&builtin_select))
     DBUG_RETURN(TRUE);
   DBUG_RETURN(FALSE);
-}
-
-void LEX::main_select_cut()
-{
-  DBUG_ENTER("LEX::main_select_cut");
-  if (thd->is_main_lex(this))
-    thd->select_number= 0;
-  unit.cut_subtree();
-  all_selects_list= 0;
-  builtin_select.link_prev= NULL; // indicator of removel
-  DBUG_VOID_RETURN;
 }
 
 bool LEX::new_main_select_anker(SELECT_LEX *sel)

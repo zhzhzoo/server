@@ -7458,7 +7458,7 @@ void THD::reset_for_next_command(bool do_clear_error)
     clear_error(1);
 
   thd->free_list= 0;
-  thd->select_number= 1;
+  thd->select_number= 0;
   /*
     Those two lines below are theoretically unneeded as
     THD::cleanup_after_query() should take care of this already.
