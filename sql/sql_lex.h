@@ -843,13 +843,13 @@ public:
   int save_union_explain_part2(Explain_query *output);
   unit_common_op common_op();
 
-  bool automatic_op_precedence();
   void reset_distinct();
   void fix_distinct(st_select_lex_unit *new_unit);
 
   void register_select_chain(SELECT_LEX *first_sel);
 
   bool set_nest_level(int new_nest_level);
+  bool check_parameters(SELECT_LEX *main_select);
 
   friend class st_select_lex;
 };
@@ -1318,6 +1318,7 @@ public:
     DBUG_VOID_RETURN;
   }
   bool set_nest_level(int new_nest_level);
+  bool check_parameters(SELECT_LEX *main_select);
   void mark_select()
   {
     DBUG_ENTER("st_select_lex::mark_select()");
@@ -3834,8 +3835,6 @@ public:
                        Table_ident *table_ident);
   bool add_grant_command(THD *thd, enum_sql_command sql_command_arg,
                          stored_procedure_type type_arg);
-  SELECT_LEX *push_selects_down(SELECT_LEX *exclude_start,
-                                SELECT_LEX *exclude_end, bool automatic);
   bool make_select_in_brackets(SELECT_LEX* dummy_select,
                                SELECT_LEX *nselect, bool automatic);
   SELECT_LEX *shift_selects_down(SELECT_LEX *exclude_start);
@@ -3860,6 +3859,7 @@ public:
 
     builtin_select.exclude_from_global();
   }
+  bool check_semantics_main_unit();
 };
 
 

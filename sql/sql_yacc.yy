@@ -4935,12 +4935,11 @@ opt_create_select:
 create_select_query_expression:
         query_expression
         {
-            if ($1->set_nest_level(1))
-              MYSQL_YYABORT;
-
             SELECT_LEX *first_select= $1->first_select();
 
             Lex->insert_select_hack(first_select);
+            if (Lex->check_semantics_main_unit())
+              MYSQL_YYABORT;
 
             if (Lex->sql_command == SQLCOM_INSERT ||
                 Lex->sql_command == SQLCOM_REPLACE)
@@ -8599,9 +8598,10 @@ select_new:
           query_expression
           {
 
+            Lex->set_main_unit($1);
             if ($1->set_nest_level(1))
               MYSQL_YYABORT;
-            Lex->set_main_unit($1);
+
 
             SELECT_LEX *fake= Lex->unit.fake_select_lex;
             if (fake)
@@ -8906,37 +8906,21 @@ select_option:
           query_expression_option
         | SQL_NO_CACHE_SYM
           {
-            /* 
-              Allow this flag only on the first top-level SELECT statement, if
-              SQL_CACHE wasn't specified, and only once per query.
-             */
-            if (Lex->first_select_lex())
-              my_yyabort_error((ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_NO_CACHE"));
-            if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_CACHE)
-              my_yyabort_error((ER_WRONG_USAGE, MYF(0), "SQL_CACHE", "SQL_NO_CACHE"));
-            if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_NO_CACHE)
+            /*
+              Allow this flag once per query.
+            */
+            if (Select->options & OPTION_NO_QUERY_CACHE)
               my_yyabort_error((ER_DUP_ARGUMENT, MYF(0), "SQL_NO_CACHE"));
-
-            Lex->safe_to_cache_query=0;
-            Lex->builtin_select.options&= ~OPTION_TO_QUERY_CACHE;
-            Lex->builtin_select.sql_cache= SELECT_LEX::SQL_NO_CACHE;
+            Select->options|= OPTION_NO_QUERY_CACHE;
           }
         | SQL_CACHE_SYM
           {
-            /* 
-              Allow this flag only on the first top-level SELECT statement, if
-              SQL_NO_CACHE wasn't specified, and only once per query.
-             */
-            if (Lex->first_select_lex())
-              my_yyabort_error((ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_CACHE"));
-            if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_NO_CACHE)
-              my_yyabort_error((ER_WRONG_USAGE, MYF(0), "SQL_NO_CACHE", "SQL_CACHE"));
-            if (Lex->builtin_select.sql_cache == SELECT_LEX::SQL_CACHE)
+            /*
+              Allow this flag once per query.
+            */
+            if (Select->options & OPTION_TO_QUERY_CACHE)
               my_yyabort_error((ER_DUP_ARGUMENT, MYF(0), "SQL_CACHE"));
-
-            Lex->safe_to_cache_query=1;
-            Lex->builtin_select.options|= OPTION_TO_QUERY_CACHE;
-            Lex->builtin_select.sql_cache= SELECT_LEX::SQL_CACHE;
+            Select->options|= OPTION_TO_QUERY_CACHE;
           }
         ;
 
@@ -16346,8 +16330,6 @@ query_expression_option:
           STRAIGHT_JOIN { Select->options|= SELECT_STRAIGHT_JOIN; }
         | HIGH_PRIORITY
           {
-            if (check_simple_select())
-              MYSQL_YYABORT;
             YYPS->m_lock_type= TL_READ_HIGH_PRIORITY;
             YYPS->m_mdl_type= MDL_SHARED_READ;
             Select->options|= SELECT_HIGH_PRIORITY;
@@ -16355,18 +16337,8 @@ query_expression_option:
         | DISTINCT         { Select->options|= SELECT_DISTINCT; }
         | SQL_SMALL_RESULT { Select->options|= SELECT_SMALL_RESULT; }
         | SQL_BIG_RESULT   { Select->options|= SELECT_BIG_RESULT; }
-        | SQL_BUFFER_RESULT
-          {
-            if (check_simple_select())
-              MYSQL_YYABORT;
-            Select->options|= OPTION_BUFFER_RESULT;
-          }
-        | SQL_CALC_FOUND_ROWS
-          {
-            if (check_simple_select())
-              MYSQL_YYABORT;
-            Select->options|= OPTION_FOUND_ROWS;
-          }
+        | SQL_BUFFER_RESULT { Select->options|= OPTION_BUFFER_RESULT; }
+        | SQL_CALC_FOUND_ROWS { Select->options|= OPTION_FOUND_ROWS; }
         | ALL { Select->options|= SELECT_ALL; }
         ;
 
@@ -16457,10 +16429,10 @@ view_select:
           query_expression
           view_check_option
           {
-            if ($2->set_nest_level(1))
-              MYSQL_YYABORT;
             SQL_I_List<TABLE_LIST> *save= &Lex->first_select_lex()->table_list;
             Lex->set_main_unit($2);
+            if (Lex->check_semantics_main_unit())
+              MYSQL_YYABORT;
             Lex->first_select_lex()->table_list.push_front(save);
             Lex->current_select= Lex->first_select_lex();
             Lex->create_view->check= $3;

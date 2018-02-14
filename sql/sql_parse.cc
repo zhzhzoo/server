@@ -8987,7 +8987,7 @@ bool check_simple_select()
 {
   THD *thd= current_thd;
   LEX *lex= thd->lex;
-  if (lex->first_select_lex())
+  if (lex->current_select != lex->first_select_lex())
   {
     char command[80];
     Lex_input_stream *lip= & thd->m_parser_state->m_lip;

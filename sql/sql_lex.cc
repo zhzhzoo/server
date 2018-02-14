@@ -5171,10 +5171,6 @@ LEX::wrap_unit_into_derived(SELECT_LEX_UNIT *unit)
 
   derived_tables|= DERIVED_SUBQUERY;
 
-  /* TODO: count from the other end */
-  if (wrapping_sel->set_nest_level(1))
-    DBUG_RETURN(NULL);
-
   DBUG_RETURN(wrapping_sel);
 
 err:
@@ -5241,119 +5237,12 @@ SELECT_LEX *LEX::link_selects_chain_down(SELECT_LEX *sel)
 
   derived_tables|= DERIVED_SUBQUERY;
 
-   /* TODO: count from the other end */
-  if (dummy_select->set_nest_level(1))
-     DBUG_RETURN(NULL);
-
   DBUG_RETURN(dummy_select);
 
 err:
   pop_select();
   DBUG_RETURN(NULL);
 }
-
-SELECT_LEX *LEX::push_selects_down(SELECT_LEX *exclude_start,
-                                   SELECT_LEX *exclude_end, bool automatic)
-{
-  SELECT_LEX_UNIT *unit= exclude_start->master_unit();
-  SELECT_LEX *dummy_select;
-  int old_nest_level= exclude_start->nest_level;
-  DBUG_ENTER("LEX::push_selects_down");
-
-  /* prepare dummy select */
-  if (!(dummy_select= alloc_select(TRUE)))
-    DBUG_RETURN(NULL);
-  current_select->braces_depth= get_braces_depth();
-
-  dummy_select->context.outer_context= exclude_start->context.outer_context;
-  dummy_select->set_linkage(exclude_start->linkage);
-  /* cut out the chain and put dummy_select instaed */
-  exclude_start->prev[0]= dummy_select;
-  dummy_select->prev= exclude_start->prev;
-  dummy_select->master= unit;
-  if ((dummy_select->next= exclude_end))
-  {
-    exclude_end->prev[0]= NULL;
-    exclude_end->prev= &dummy_select->next;
-  }
-
-  //current_select= dummy_select;
-  //mysql_init_select(this);
-  if (make_select_in_brackets(dummy_select, exclude_start, automatic))
-      DBUG_RETURN(NULL);
-
-  DBUG_ASSERT(unit != exclude_start->master_unit());
-  unit->fix_distinct(exclude_start->master_unit());
-
-  current_select= dummy_select;
-  if (dummy_select->set_nest_level(old_nest_level))
-    DBUG_RETURN(NULL);
-  DBUG_PRINT("info", ("Dummy returned: %p", dummy_select));
-  DBUG_RETURN(dummy_select);
-}
-
-/*
-SELECT_LEX *LEX::push_selects_down(SELECT_LEX *exclude_start)
-{
-  DBUG_ENTER("LEX::push_selects_down");
-  SELECT_LEX_UNIT *unit= exclude_start->master_unit();
-
-
-  if (unit->first_select() == exclude_start)
-  {
-    SELECT_LEX *dummy_select;
-    SELECT_LEX *distinct= unit->union_distinct;
-    int old_nest_level= exclude_start->nest_level;
-    unit->union_distinct= NULL;
-    unit->slave= NULL;
-
-    if (!(dummy_select= new (thd->mem_root) SELECT_LEX()))
-      DBUG_RETURN(NULL);
-    dummy_select->select_number= ++thd->select_number;
-    dummy_select->parent_lex= this;
-    dummy_select->init_query();
-    dummy_select->init_select();
-    current_select->braces_depth= get_braces_depth();
-    dummy_select->nest_level_base= &this->unit;
-
-    dummy_select->include_down(unit);
-    dummy_select->context.outer_context= exclude_start->context.outer_context;
-    dummy_select->
-      include_global((st_select_lex_node**)&all_selects_list);
-    current_select= dummy_select;
-    dummy_select->context.resolve_in_select_list= TRUE;
-
-    mysql_init_select(this);
-    current_select->set_linkage(exclude_start->linkage);
-
-    if (make_select_in_brackets(dummy_select, exclude_start, FALSE))
-      DBUG_RETURN(NULL);
-
-    DBUG_ASSERT(unit != exclude_start->master_unit());
-    exclude_start->master_unit()->union_distinct= distinct;
-
-    current_select= dummy_select;
-    //lex->nest_level++;
-    if (dummy_select->set_nest_level(old_nest_level))
-      DBUG_RETURN(NULL);
-    DBUG_PRINT("info", ("Dummy returned: %p", dummy_select));
-    DBUG_RETURN(dummy_select);
-  }
-
-  if (!exclude_not_first_select(exclude_start) ||
-      add_unit_in_brackets(exclude_start))
-    DBUG_RETURN(NULL);
-  if (unit->union_distinct && unit != unit->union_distinct->master_unit())
-  {
-    SELECT_LEX *distinct_sel= unit->union_distinct;
-    distinct_sel->master_unit()->union_distinct= distinct_sel;
-    unit->union_distinct= NULL;
-  }
-  DBUG_PRINT("info", ("Current outer returned: %p",
-             current_select->master_unit()->outer_select()));
-  DBUG_RETURN(current_select->master_unit()->outer_select());
-}
-*/
 
 /**
   Put given (new) SELECT_LEX level below after currect (last) SELECT
@@ -5468,7 +5357,6 @@ bool LEX::make_select_in_brackets(SELECT_LEX* dummy_select,
     DBUG_RETURN(TRUE);
 
   current_select= nselect;
-  //current_select->nest_level++;
   DBUG_RETURN(FALSE);
 }
 
@@ -7557,6 +7445,97 @@ bool st_select_lex_unit::set_nest_level(int new_nest_level)
   DBUG_RETURN(FALSE);
 }
 
+
+bool st_select_lex::check_parameters(SELECT_LEX *main_select)
+{
+  DBUG_ENTER("st_select_lex::check_parameters");
+  DBUG_PRINT("enter", ("select #%d %p nest level: %d",
+                       select_number, this, nest_level));
+
+  if ((options & HIGH_PRIORITY) && this != main_select)
+  {
+    my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "HIGH_PRIORITY");
+    DBUG_RETURN(TRUE);
+  }
+  if ((options & SQL_BUFFER_RESULT) && this != main_select)
+  {
+    my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_BUFFER_RESULT");
+    DBUG_RETURN(TRUE);
+  }
+  if ((options & SQL_CALC_FOUND_ROWS) && this != main_select)
+  {
+    my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_CALC_FOUND_ROWS");
+    DBUG_RETURN(TRUE);
+  }
+  if (options & OPTION_NO_QUERY_CACHE)
+  {
+    /*
+      Allow this flag only on the first top-level SELECT statement, if
+      SQL_CACHE wasn't specified.
+    */
+    if (this != main_select)
+    {
+      my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_NO_CACHE");
+      DBUG_RETURN(TRUE);
+    }
+    if (main_select->sql_cache == SELECT_LEX::SQL_CACHE)
+    {
+      my_error(ER_WRONG_USAGE, MYF(0), "SQL_CACHE", "SQL_NO_CACHE");
+      DBUG_RETURN(TRUE);
+    }
+    parent_lex->safe_to_cache_query=0;
+    main_select->options&= ~OPTION_TO_QUERY_CACHE;
+    main_select->sql_cache= SELECT_LEX::SQL_NO_CACHE;
+  }
+  if (options & OPTION_NO_QUERY_CACHE)
+  {
+    /*
+      Allow this flag only on the first top-level SELECT statement, if
+      SQL_NO_CACHE wasn't specified.
+    */
+    if (this != main_select)
+    {
+      my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_CACHE");
+      DBUG_RETURN(TRUE);
+    }
+    if (main_select->sql_cache == SELECT_LEX::SQL_NO_CACHE)
+    {
+      my_error(ER_WRONG_USAGE, MYF(0), "SQL_NO_CACHE", "SQL_CACHE");
+      DBUG_RETURN(TRUE);
+    }
+    parent_lex->safe_to_cache_query=1;
+    main_select->options|= OPTION_TO_QUERY_CACHE;
+    main_select->sql_cache= SELECT_LEX::SQL_CACHE;
+  }
+
+  for (SELECT_LEX_UNIT *u= first_inner_unit(); u; u= u->next_unit())
+  {
+    if (u->check_parameters(main_select))
+      DBUG_RETURN(TRUE);
+  }
+  DBUG_RETURN(FALSE);
+}
+
+
+bool st_select_lex_unit::check_parameters(SELECT_LEX *main_select)
+{
+  for(SELECT_LEX *sl= first_select(); sl; sl= sl->next_select())
+  {
+    if (sl->check_parameters(main_select))
+      return TRUE;
+  }
+  return FALSE;
+}
+
+
+bool LEX::check_semantics_main_unit()
+{
+  if (unit.set_nest_level(1) ||
+      unit.check_parameters(first_select_lex()))
+    return TRUE;
+  return FALSE;
+}
+
 int set_statement_var_if_exists(THD *thd, const char *var_name,
                                 size_t var_name_length, ulonglong value)
 {
@@ -7702,30 +7681,6 @@ Item *LEX::make_item_func_replace(THD *thd,
     new (thd->mem_root) Item_func_replace(thd, org, find, replace);
 }
 
-
-bool st_select_lex_unit::automatic_op_precedence()
-{
-  bool high_prec= TRUE;
-
-  for(SELECT_LEX *start= first_select();
-      start->next_select();
-      start= start->next_select())
-  {
-    if (start->next_select()->linkage != INTERSECT_TYPE)
-      high_prec= FALSE;
-    else if (!high_prec)
-    {
-      SELECT_LEX *end= start->next_select()->next_select();
-      while (end && end->linkage == INTERSECT_TYPE)
-      {
-        end= end->next_select();
-      }
-      if (!(start= start->parent_lex->push_selects_down(start, end, TRUE)))
-        return TRUE;
-    }
-  }
-  return FALSE;
-}
 
 void st_select_lex_unit::reset_distinct()
 {
