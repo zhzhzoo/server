@@ -8777,7 +8777,7 @@ query_expression_unit:
          query_primary
          {
            SELECT_LEX *last= $1.prev_last->next_select();
-           int cmp= cmp_unit_op($3->linkage, last->linkage);
+           int cmp= cmp_unit_op($2.unit_type, last->linkage);
            if (cmp == 0)
            {
              //Lex->link_select(last, $3, $2);
