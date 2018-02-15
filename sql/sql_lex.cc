@@ -2241,6 +2241,7 @@ void st_select_lex::init_select()
   sj_nests.empty();
   sj_subselects.empty();
   group_list.empty();
+  order_limit_lock_parse= NULL;
   if (group_list_ptrs)
     group_list_ptrs->clear();
   type= db= 0;
@@ -7452,6 +7453,8 @@ bool st_select_lex::check_parameters(SELECT_LEX *main_select)
   DBUG_PRINT("enter", ("select #%d %p nest level: %d",
                        select_number, this, nest_level));
 
+  DBUG_ASSERT(order_limit_lock_parse == NULL);
+
   if ((options & HIGH_PRIORITY) && this != main_select)
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "HIGH_PRIORITY");
@@ -7788,10 +7791,34 @@ bool LEX::new_main_select_anker(SELECT_LEX *sel)
 
 bool Lex_order_limit_lock::set_to(SELECT_LEX *sel)
 {
-  if (sel->master_unit()->first_select()->next_select())
-    sel= sel->master_unit()->fake_select_lex;
-  if (lock.defined_lock && sel == sel->master_unit()->fake_select_lex)
-    return TRUE;
+  /*TODO: lock */
+  //if (lock.defined_lock && sel == sel->master_unit()->fake_select_lex)
+  //  return TRUE;
+  if (lock.defined_timeout)
+  {
+    THD *thd= sel->parent_lex->thd;
+     if (set_statement_var_if_exists(thd,
+                                     C_STRING_WITH_LEN("lock_wait_timeout"),
+                                     lock.timeout) ||
+         set_statement_var_if_exists(thd,
+                                     C_STRING_WITH_LEN("innodb_lock_wait_timeout"),
+                                     lock.timeout))
+       return TRUE;
+  }
+  if (lock.defined_lock)
+  {
+    sel->parent_lex->safe_to_cache_query= 0;
+    if (lock.update_lock)
+    {
+      sel->lock_type= TL_READ_WITH_SHARED_LOCKS;
+      sel->set_lock_for_tables(TL_READ_WITH_SHARED_LOCKS);
+    }
+    else
+    {
+      sel->lock_type= TL_WRITE;
+      sel->set_lock_for_tables(TL_WRITE);
+    }
+  }
   sel->explicit_limit= limit.explicit_limit;
   sel->select_limit= limit.select_limit;
   sel->offset_limit= limit.offset_limit;
@@ -7807,7 +7834,6 @@ bool Lex_order_limit_lock::set_to(SELECT_LEX *sel)
     }
     sel->order_list= *(order_list);
   }
-  /*TODO: lock */
   return FALSE;
 }
 
