@@ -879,7 +879,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 101 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 106
+%expect 110
 
 /*
    Comments for TOKENS.
@@ -1838,8 +1838,10 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         query_specification
         query_specification_parens
         query_specification_with_opt_parens
+/*
         query_specification_with_opt_tail
         query_specification_with_opt_tail_parens
+*/
         query_primary
         query_expression_unit_parens
 
@@ -8654,7 +8656,16 @@ query_specification_parens:
           '(' query_specification_parens ')'
           { $$= $2; }
         | '(' query_specification ')'
-          { $$= $2; }
+          {
+            Lex->push_select($2);
+          }
+         opt_order_clause
+         opt_limit_clause
+         opt_select_lock_type
+         {
+           Lex->pop_select();
+           $$= $2;
+         }
         ;
 
 
@@ -8665,7 +8676,7 @@ query_specification_with_opt_parens:
           { $$= $1; }
         ;
 
-
+/*
 query_specification_with_opt_tail:
          query_specification_with_opt_parens
          {
@@ -8673,26 +8684,30 @@ query_specification_with_opt_tail:
          }
          opt_order_clause
          opt_limit_clause
-         select_lock_type
+         opt_select_lock_type
          {
            Lex->pop_select();
            $$= $1;
          }
        ;
+*/
 
-
+/*
 query_specification_with_opt_tail_parens:
          '(' query_specification_with_opt_tail_parens ')'
           { $$= $2; }
        | '(' query_specification_with_opt_tail ')'
           { $$= $2; }
        ;
+*/
 
 query_primary:
          query_specification_with_opt_parens
          { $$= $1; }
+/*
        | query_specification_with_opt_tail_parens
          { $$= $1; }
+*/
        | query_expression_unit_with_opt_tail_parens
          {
            $$= Lex->wrap_unit_into_derived($1);
