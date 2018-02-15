@@ -876,10 +876,10 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %parse-param { THD *thd }
 %lex-param { THD *thd }
 /*
-  Currently there are 103 shift/reduce conflicts.
+  Currently there are 101 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 102
+%expect 106
 
 /*
    Comments for TOKENS.
@@ -8637,6 +8637,9 @@ query_specification:
          opt_group_clause
          opt_having_clause
          opt_window_clause
+         opt_order_clause
+         opt_limit_clause
+         opt_select_lock_type
          {
            $$= Lex->pop_select();
          }
@@ -11850,6 +11853,7 @@ opt_order_clause:
 order_clause:
           ORDER_SYM BY
           {
+#if 0
             LEX *lex=Lex;
             SELECT_LEX *sel= lex->current_select;
             SELECT_LEX_UNIT *unit= sel-> master_unit();
@@ -11890,6 +11894,7 @@ order_clause:
                DBUG_ASSERT(sel->master_unit()->fake_select_lex);
                lex->current_select= sel->master_unit()->fake_select_lex;
              }
+#endif
           }
           order_list
           {
@@ -11918,6 +11923,7 @@ opt_limit_clause:
 limit_clause_init:
           LIMIT
           {
+#if 0
             SELECT_LEX *sel= Select;
             if (sel->master_unit()->is_unit_op() && !sel->braces)
             {
@@ -11925,6 +11931,7 @@ limit_clause_init:
               Lex->current_select= sel->master_unit()->fake_select_lex;
               DBUG_ASSERT(Select);
             }
+#endif
           }
         ;  
 
