@@ -65,6 +65,7 @@ let $default_engine= `select @@default_storage_engine`;
 let $non_default_engine= `select if(@@default_storage_engine = 'InnoDB', 'MyISAM', 'InnoDB')`;
 let $sys_datatype_expl= timestamp(6);
 let $sys_datatype_expl_uc= TIMESTAMP(6);
+let $sys_datatype_max= TIMESTAMP'2038-01-19 03:14:07.999999';
 
 if ($MTR_COMBINATION_MYISAM)
 {
@@ -74,5 +75,6 @@ if ($MTR_COMBINATION_TRX_ID)
 {
   let $sys_datatype_expl= bigint(20) unsigned;
   let $sys_datatype_expl_uc= BIGINT(20) UNSIGNED;
+  let $sys_datatype_max= 18446744073709551615;
 }
 --enable_query_log
