@@ -8576,6 +8576,8 @@ bool st_select_lex_unit::add_fake_select_lex(THD *thd_arg)
   fake_select_lex->set_linkage(GLOBAL_OPTIONS_TYPE);
   fake_select_lex->select_limit= 0;
 
+  fake_select_lex->no_table_names_allowed= 1;
+
   fake_select_lex->context.outer_context=first_sl->context.outer_context;
   /* allow item list resolving in fake select for ORDER BY */
   fake_select_lex->context.resolve_in_select_list= TRUE;

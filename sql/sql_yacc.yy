@@ -8832,11 +8832,12 @@ query_expression_unit:
              // wrap stored part in a select, then continue to connect parts
              if ((last= Lex->pop_new_select_and_wrap()) == NULL)
                MYSQL_YYABORT;
+             last->set_master_unit($$);
            }
            last->link_neighbour($3);
            $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
+           $3->set_master_unit($$);
            $$= $1;
-           last->set_master_unit($$);
            $$->pre_last_parse= last;
          }
        ;
