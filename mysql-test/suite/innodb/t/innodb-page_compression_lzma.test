@@ -1,6 +1,7 @@
 -- source include/have_innodb.inc
 -- source include/have_innodb_lzma.inc
 -- source include/not_embedded.inc
+-- source include/big_test.inc
 
 # lzma
 set global innodb_compression_algorithm = lzma;
