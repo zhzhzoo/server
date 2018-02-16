@@ -883,7 +883,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 101 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 105
+%expect 98
 
 /*
    Comments for TOKENS.
@@ -1842,21 +1842,18 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         query_specification
         query_specification_parens
         query_specification_with_opt_parens
-/*
-        query_specification_with_opt_tail
-        query_specification_with_opt_tail_parens
-*/
         query_primary
-        query_expression_unit_parens
+        query_specification_with_tail
+        query_specification_with_tail_parens
 
 %type <select_lex_unit> 
         query_expression_unit_with_opt_parens
-        query_expression_unit_with_opt_tail
-        query_expression_unit_with_opt_tail_parens
         query_expression_body
         query_expression
-
-%type <select_list> query_expression_unit
+        query_expression_unit
+        query_expression_unit_parens
+        query_expression_unit_with_tail_parens
+        query_expression_unit_with_tail
 
 %type <boolfunc2creator> comp_op
 
@@ -8679,12 +8676,15 @@ query_specification_with_opt_parens:
 
 query_specification_with_tail:
           query_specification_with_opt_parens
+          {
+            Lex->push_select($1);
+          }
           order_limit_lock_clauses
-          { 
-            $1->order_limit_lock_parse= $2;
-            $1->order_limit_lock_parse->set_to($1);
+          {
+            Lex->pop_select();
+            $3->set_to($1);
             $$= $1;
-          }        
+          }
         ;
 
 query_specification_with_tail_parens:
@@ -8698,7 +8698,7 @@ query_primary:
          query_specification
          { $$= $1; }
        | query_specification_with_tail_parens
-         { $$= $2; }
+         { $$= $1; }
        | query_expression_unit_parens
          {
            $$= Lex->wrap_unit_into_derived($1);
@@ -8707,7 +8707,7 @@ query_primary:
          }
        |  query_expression_unit_with_tail_parens
          {
-           $$= Lex->wrap_unit_into_derived($2);
+           $$= Lex->wrap_unit_into_derived($1);
            if ($$ == NULL)
              YYABORT;
          }
@@ -8723,12 +8723,15 @@ query_expression_unit_with_opt_parens:
 
 query_expression_unit_with_tail:
           query_expression_unit_with_opt_parens
+          {
+            Lex->push_select($1->fake_select_lex);
+          }
           order_limit_lock_clauses
-          { 
-            $1->fake_select_lex->order_limit_lock_parse= $2;
-            $1->fake_select_lex->order_limit_lock_parse->set_to($1->fake_select_lex);
+          {
+            Lex->pop_select();
+            $3->set_to($1->fake_select_lex);
             $$= $1;
-          }        
+          }
         ;
 
 
@@ -8781,31 +8784,16 @@ query_expression_unit_parens:
           { $$= $2; }
        | '(' query_expression_unit ')'
          {
-           SELECT_LEX *sel;
-           SELECT_LEX *last= $2.prev_last->next_select();
-           int cmp= cmp_unit_op($2.first->next_select()->linkage,
+           SELECT_LEX *last= $2->pre_last_parse->next_select();
+           int cmp= cmp_unit_op($2->first_select()->next_select()->linkage,
                                 last->linkage);
            if (cmp < 0)
            {
-             Lex_order_limit_lock *order_limit_lock_parse=
-               last->order_limit_lock_parse;
-             last->order_limit_lock_parse= NULL;
-             if ((last= Lex->pop_new_select_and_wrap()) == NULL)
+             if (Lex->pop_new_select_and_wrap() == NULL)
                MYSQL_YYABORT;
-             last->order_limit_lock_parse= order_limit_lock_parse;
            }
 
-           if (!(sel= Lex->link_selects_chain_down($2.first)))
-              MYSQL_YYABORT;
-
-           if (last->order_limit_lock_parse)
-           {
-             last->order_limit_lock_parse->
-               set_to(sel->first_inner_unit()->fake_select_lex);
-             last->order_limit_lock_parse= NULL;
-           }
-
-           $$= sel;
+           $$= $2;
          }
        ;
 
@@ -8815,62 +8803,56 @@ query_expression_unit:
          unit_type_decl
          query_primary
          {
-           if ($1->order_limit_lock_parse)
-             thd->parse_error(ER_SYNTAX_ERROR, $2);
-
            $1->link_neighbour($4);
            $4->set_linkage_and_distinct($3.unit_type, $3.distinct);
            $$= Lex->create_unit($1);
+           $$->pre_last_parse= $1;
            if ($$ == NULL)
              YYABORT;
          }
        | query_expression_unit
-         remember_tok_start
          unit_type_decl
          query_primary
          {
-           SELECT_LEX *last= $1.prev_last->next_select();
+           SELECT_LEX *last= $1->pre_last_parse->next_select();
 
-           if (last->order_limit_lock_parse)
-             thd->parse_error(ER_SYNTAX_ERROR, $2);
-
-           int cmp= cmp_unit_op($3.unit_type, last->linkage);
+           int cmp= cmp_unit_op($2.unit_type, last->linkage);
            if (cmp == 0)
            {
-             last->link_neighbour($4);
-             $4->set_linkage_and_distinct($3.unit_type, $3.distinct);
+             // do nothing, this part will be just connected
            }
            else if (cmp > 0)
            {
-             // Store beginning and continue...
+             // Store beginning and continue to connect parts
              if (Lex->push_new_select(last))
                MYSQL_YYABORT;
-             last->link_neighbour($4);
-             $4->set_linkage_and_distinct($3.unit_type, $3.distinct);
            }
            else /* cmp < 0 */
            {
+             // wrap stored part in a select, then continue to connect parts
              if ((last= Lex->pop_new_select_and_wrap()) == NULL)
                MYSQL_YYABORT;
            }
-           $$.first= $1.first;
-           $$.prev_last= last;
+           last->link_neighbour($3);
+           $3->set_linkage_and_distinct($2.unit_type, $2.distinct);
+           $$= $1;
+           last->set_master_unit($$);
+           $$->pre_last_parse= last;
          }
        ;
 
 query_expression_body:
-         query_primary
+         query_specification
          {
            $$= Lex->create_unit($1);
            if ($$ == NULL)
              YYABORT;
-           if ($1->order_limit_lock_parse)
-           {
-             $1->order_limit_lock_parse->set_to($$->fake_select_lex ?
-                                                $$->fake_select_lex :
-                                                $1);
-             $1->order_limit_lock_parse= NULL;
-           }
+         }
+       | query_specification_with_tail
+         {
+           $$= Lex->create_unit($1);
+           if ($$ == NULL)
+             YYABORT;
          }
        | query_expression_unit { $$= $1; }
        | query_expression_unit_with_tail { $$= $1; }
@@ -8928,18 +8910,6 @@ select_new_global_tail:
 /**
   <table expression>, as in the SQL standard.
 */
-table_expression:
-          from_clause
-          opt_where_clause
-          opt_group_clause
-          opt_having_clause
-          opt_window_clause
-        ;
-
-opt_table_expression:
-            /* Empty */
-          | table_expression
-        ;
 
 from_clause:
           FROM table_reference_list
@@ -16389,17 +16359,6 @@ unit_type_decl:
           { $$.unit_type= INTERSECT_TYPE; $$.distinct= 1; }
         | EXCEPT_SYM
           { $$.unit_type= EXCEPT_TYPE; $$.distinct= 1; }
-
-
-global_order_or_limit:
-          {
-            thd->where= "global ORDER clause";
-          }
-          order_or_limit
-          {
-            thd->where= "";
-          }
-        ;
 
 
 /*

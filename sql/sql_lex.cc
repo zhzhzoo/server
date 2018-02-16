@@ -2241,7 +2241,6 @@ void st_select_lex::init_select()
   sj_nests.empty();
   sj_subselects.empty();
   group_list.empty();
-  order_limit_lock_parse= NULL;
   if (group_list_ptrs)
     group_list_ptrs->clear();
   type= db= 0;
@@ -7452,8 +7451,6 @@ bool st_select_lex::check_parameters(SELECT_LEX *main_select)
   DBUG_ENTER("st_select_lex::check_parameters");
   DBUG_PRINT("enter", ("select #%d %p nest level: %d",
                        select_number, this, nest_level));
-
-  DBUG_ASSERT(order_limit_lock_parse == NULL);
 
   if ((options & HIGH_PRIORITY) && this != main_select)
   {
