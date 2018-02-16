@@ -7856,7 +7856,7 @@ bool LEX::insert_select_hack(SELECT_LEX *sel)
 
   DBUG_ASSERT(first_select_lex() == &builtin_select);
   DBUG_ASSERT(sel != NULL);
-  DBUG_ASSERT(sel->next_select() == NULL);
+  //  DBUG_ASSERT(sel->next_select() == NULL);
 
 
   if (builtin_select.link_prev)

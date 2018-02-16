@@ -1877,7 +1877,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 
 %type <order_limit_lock> order_or_limit order_limit_lock_clauses
 
-%type <select_order> order_clause order_list
+%type <select_order> opt_order_clause order_clause order_list
 
 %type <NONE>
         analyze_stmt_command
@@ -8652,10 +8652,8 @@ query_specification:
          opt_group_clause
          opt_having_clause
          opt_window_clause
-         order_limit_lock_clauses
          {
            $$= Lex->pop_select();
-           $$->order_limit_lock_parse= $11;
          }
       ;
 
@@ -8668,22 +8666,7 @@ query_specification_parens:
           '(' query_specification_parens ')'
           { $$= $2; }
         | '(' query_specification ')'
-          {
-            $2->braces= TRUE;
-            if ($2->order_limit_lock_parse)
-            {
-              $2->order_limit_lock_parse->set_to($2);
-              $2->order_limit_lock_parse= NULL;
-            }
-            Lex->push_select($2);
-          }
-          remember_tok_start
-          order_limit_lock_clauses
-          {
-            Lex->pop_select();
-            $$= $2;
-            $$->order_limit_lock_parse= $6;
-          }
+          { $$= $2; }
         ;
 
 
@@ -8694,65 +8677,69 @@ query_specification_with_opt_parens:
           { $$= $1; }
         ;
 
-/*
-query_specification_with_opt_tail:
-         query_specification_with_opt_parens
-         {
-           Lex->push_select($1);
-         }
-         opt_order_clause
-         opt_limit_clause
-         opt_select_lock_type
-         {
-           Lex->pop_select();
-           $$= $1;
-         }
-       ;
-*/
+query_specification_with_tail:
+          query_specification_with_opt_parens
+          order_limit_lock_clauses
+          { 
+            $1->order_limit_lock_parse= $2;
+            $1->order_limit_lock_parse->set_to($1);
+            $$= $1;
+          }        
+        ;
 
-/*
-query_specification_with_opt_tail_parens:
-         '(' query_specification_with_opt_tail_parens ')'
+query_specification_with_tail_parens:
+          '(' query_specification_with_tail_parens ')'
           { $$= $2; }
-       | '(' query_specification_with_opt_tail ')'
+        | '(' query_specification_with_tail ')'
           { $$= $2; }
-       ;
-*/
+        ;
 
 query_primary:
-         query_specification_with_opt_parens
+         query_specification
          { $$= $1; }
-/*
-       | query_specification_with_opt_tail_parens
-         { $$= $1; }
-*/
-       | query_expression_unit_with_opt_tail_parens
+       | query_specification_with_tail_parens
+         { $$= $2; }
+       | query_expression_unit_parens
          {
            $$= Lex->wrap_unit_into_derived($1);
            if ($$ == NULL)
              YYABORT;
          }
-       ;
-
-query_expression_unit_with_opt_tail_parens:
-         '(' query_expression_unit_with_opt_tail_parens ')'
-          { $$= $2; }
-       | '(' query_expression_unit_with_opt_tail ')'
-          { $$= $2; }
-       ;
-
-query_expression_unit_with_opt_tail:
-         query_expression_unit_with_opt_parens
-         order_limit_lock_clauses
+       |  query_expression_unit_with_tail_parens
          {
-           SELECT_LEX *sel= Lex->pop_select();
-           $$= $1;
-           if ($2)
-             $2->set_to(sel);
-
+           $$= Lex->wrap_unit_into_derived($2);
+           if ($$ == NULL)
+             YYABORT;
          }
        ;
 
+
+query_expression_unit_with_opt_parens:
+          query_expression_unit_parens
+          { $$= $1; }
+        | query_expression_unit
+          { $$= $1; }
+        ;
+
+query_expression_unit_with_tail:
+          query_expression_unit_with_opt_parens
+          order_limit_lock_clauses
+          { 
+            $1->fake_select_lex->order_limit_lock_parse= $2;
+            $1->fake_select_lex->order_limit_lock_parse->set_to($1->fake_select_lex);
+            $$= $1;
+          }        
+        ;
+
+
+query_expression_unit_with_tail_parens:
+          '(' query_expression_unit_with_tail_parens ')'
+          { $$= $2; }
+        | '(' query_expression_unit_with_tail ')'
+          { $$= $2; }
+        ;
+
+/*
 query_expression_unit_with_opt_parens:
          query_expression_unit_parens
          {
@@ -8787,6 +8774,7 @@ query_expression_unit_with_opt_parens:
            Lex->push_select($$->fake_select_lex);
          }
        ;
+*/
 
 query_expression_unit_parens:
          '(' query_expression_unit_parens ')'
@@ -8832,8 +8820,9 @@ query_expression_unit:
 
            $1->link_neighbour($4);
            $4->set_linkage_and_distinct($3.unit_type, $3.distinct);
-           $$.first= $1;
-           $$.prev_last= $1;
+           $$= Lex->create_unit($1);
+           if ($$ == NULL)
+             YYABORT;
          }
        | query_expression_unit
          remember_tok_start
@@ -8883,7 +8872,8 @@ query_expression_body:
              $1->order_limit_lock_parse= NULL;
            }
          }
-       | query_expression_unit_with_opt_tail { $$= $1; }
+       | query_expression_unit { $$= $1; }
+       | query_expression_unit_with_tail { $$= $1; }
        ;
 
 query_expression:
@@ -11941,7 +11931,9 @@ alter_order_item:
 
 opt_order_clause:
           /* empty */
+          { $$= NULL; }
         | order_clause
+          { $$= $1; }
         ;
 
 order_clause:
@@ -12117,11 +12109,7 @@ order_or_limit:
         ;
 
 order_limit_lock_clauses:
-          /* empty */
-          {
-            $$= NULL;
-          }
-        | order_or_limit opt_select_lock_type
+          order_or_limit opt_select_lock_type
           {
             if ($1)
             {
@@ -12835,6 +12823,8 @@ update:
           }
           opt_where_clause opt_order_clause delete_limit_clause
           {
+            if ($10)
+              Select->order_list= *($10);
             Lex->pop_select(); //main select
           }
         ;
