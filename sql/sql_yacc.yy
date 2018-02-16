@@ -8893,6 +8893,7 @@ subselect:
 select_new_global_tail:
           /* empty */
         | procedure_clause
+        | into
         | into order_limit_lock_clauses
           {
             if ($2)
