@@ -127,7 +127,6 @@ unlock tables;
 let $wait_condition= select variable_value > 0 from information_schema.global_status where variable_name = 'INNODB_NUM_PAGES_DECRYPTED';
 --source include/wait_condition.inc
 
-SELECT variable_value > 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_encrypted';
 SELECT variable_value > 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_decrypted';
 SELECT variable_value > 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_page_compressed';
 SELECT variable_value > 0 FROM information_schema.global_status WHERE variable_name = 'innodb_num_pages_page_decompressed';
