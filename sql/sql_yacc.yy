@@ -883,7 +883,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 98 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 98
+%expect 99
 
 /*
    Comments for TOKENS.
@@ -1642,7 +1642,8 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         NCHAR_STRING
 
 %type <lex_str_ptr>
-        opt_table_alias
+        opt_table_alias_clause
+        table_alias_clause
 
 %type <lex_string_with_pos>
         ident ident_with_tok_start
@@ -11408,7 +11409,7 @@ join_table_parens:
 
 
 table_primary_ident:
-          table_ident opt_use_partition opt_table_alias opt_key_definition
+          table_ident opt_use_partition opt_table_alias_clause opt_key_definition
           {
             SELECT_LEX *sel= Select;
             sel->table_join_options= 0;
@@ -11440,9 +11441,30 @@ table_primary_ident:
 */
 
 table_primary_derived:
-          '('
+          query_primary_parens table_alias_clause
+          {
+            LEX *lex=Lex;
+            lex->derived_tables|= DERIVED_SUBQUERY;
+            $1->linkage= DERIVED_TABLE_TYPE;
+
+
+            // Add the subtree of subquery to the current SELECT_LEX
+            SELECT_LEX *curr_sel= Lex->select_stack_head();
+            DBUG_ASSERT(Lex->current_select == curr_sel);
+            curr_sel->register_unit($1->master_unit(), &curr_sel->context);
+            curr_sel->add_statistics($1->master_unit());
+
+            Table_ident *ti= new (thd->mem_root) Table_ident($1->master_unit());
+            if (ti == NULL)
+              MYSQL_YYABORT;
+            if (!($$= curr_sel->add_table_to_list(lex->thd,
+                                                  ti, $2, 0,
+                                                  TL_READ, MDL_SHARED_READ)))
+              MYSQL_YYABORT;
+          }
+        | '('
           query_expression
-          ')' opt_table_alias
+          ')' table_alias_clause
           {
             LEX *lex=Lex;
             lex->derived_tables|= DERIVED_SUBQUERY;
@@ -11595,9 +11617,13 @@ table_alias:
         | '='
         ;
 
-opt_table_alias:
+opt_table_alias_clause:
           /* empty */ { $$=0; }
-        | table_alias ident
+        | table_alias_clause { $$= $1; }
+        ;
+
+table_alias_clause:
+          table_alias ident
           {
             $$= (LEX_CSTRING*) thd->memdup(&$2,sizeof(LEX_STRING));
             if ($$ == NULL)
@@ -15622,7 +15648,7 @@ table_lock_list:
         ;
 
 table_lock:
-          table_ident opt_table_alias lock_option
+          table_ident opt_table_alias_clause lock_option
           {
             thr_lock_type lock_type= (thr_lock_type) $3;
             bool lock_for_write= (lock_type >= TL_WRITE_ALLOW_WRITE);
@@ -15670,7 +15696,7 @@ unlock:
 */
 
 handler:
-          HANDLER_SYM table_ident OPEN_SYM opt_table_alias
+          HANDLER_SYM table_ident OPEN_SYM opt_table_alias_clause
           {
             LEX *lex= Lex;
             if (lex->sphead)
