@@ -11451,10 +11451,13 @@ table_primary_derived:
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);
-            curr_sel->register_unit($1->master_unit(), &curr_sel->context);
-            curr_sel->add_statistics($1->master_unit());
+            SELECT_LEX_UNIT *unit= Lex->create_unit($1);
+            if (!unit)
+              YYABORT;
+            curr_sel->register_unit(unit, &curr_sel->context);
+            curr_sel->add_statistics(unit);
 
-            Table_ident *ti= new (thd->mem_root) Table_ident($1->master_unit());
+            Table_ident *ti= new (thd->mem_root) Table_ident(unit);
             if (ti == NULL)
               MYSQL_YYABORT;
             if (!($$= curr_sel->add_table_to_list(lex->thd,
