@@ -2258,6 +2258,7 @@ void st_select_lex::init_select()
   /* Set limit and offset to default values */
   select_limit= 0;      /* denotes the default limit = HA_POS_ERROR */
   offset_limit= 0;      /* denotes the default offset = 0 */
+  is_set_order_or_limit_or_lock= false;
   with_sum_func= 0;
   is_correlated= 0;
   cur_pos_in_select_list= UNDEF_POS;
@@ -7831,6 +7832,7 @@ bool Lex_order_limit_lock::set_to(SELECT_LEX *sel)
     }
     sel->order_list= *(order_list);
   }
+  sel->is_set_order_or_limit_or_lock= true;
   return FALSE;
 }
 

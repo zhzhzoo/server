@@ -956,6 +956,7 @@ public:
   SQL_I_List<ORDER> order_list;   /* ORDER clause */
   SQL_I_List<ORDER> gorder_list;
   Item *select_limit, *offset_limit;  /* LIMIT clause parameters */
+  bool is_set_order_or_limit_or_lock;
 
   /// Array of pointers to top elements of all_fields list
   Ref_ptr_array ref_pointer_array;
@@ -3284,7 +3285,7 @@ public:
     */ 
     if (first_select_lex() == all_selects_list && !sroutines.records)
     {
-      DBUG_ASSERT(!all_selects_list->next_select_in_list());
+      //      DBUG_ASSERT(!all_selects_list->next_select_in_list());
       return TRUE;
     }
     return FALSE;
@@ -3860,6 +3861,7 @@ public:
     unit.uncacheable= u->uncacheable;
     unit.register_select_chain(u->first_select());
     unit.first_select()->options|= builtin_select.options;
+    unit.fake_select_lex= u->fake_select_lex;
 
     builtin_select.exclude_from_global();
   }
