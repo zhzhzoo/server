@@ -1622,8 +1622,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %right  NOT_SYM NOT2_SYM
 %right  BINARY COLLATE_SYM
 %left  INTERVAL_SYM
-%left  INTERSECT_SYM
-%left  UNION_SYM EXCEPT_SYM
+%right UNION_SYM
 %left  ','
 
 %type <lex_str>
@@ -8715,8 +8714,7 @@ query_primary_parens:
 
 query_expression_unit:
           query_primary  
-          remember_tok_start
-          unit_type_decl
+          unit_type_decl %prec UNION_SYM
           query_primary
           {
             SELECT_LEX *sel1;
@@ -8729,16 +8727,16 @@ query_expression_unit:
               if (!sel1)
                 YYABORT;
             }
-            if (!$4->next_select())
-              sel2= $4;
+            if (!$3->next_select())
+              sel2= $3;
             else
             {
-              sel2= Lex->wrap_unit_into_derived($4->master_unit());
+              sel2= Lex->wrap_unit_into_derived($3->master_unit());
               if (!sel2)
                 YYABORT;
             }
             sel1->link_neighbour(sel2);
-            sel2->set_linkage_and_distinct($3.unit_type, $3.distinct);
+            sel2->set_linkage_and_distinct($2.unit_type, $2.distinct);
             $$= Lex->create_unit(sel1);
             $$->pre_last_parse= sel1;
             if ($$ == NULL)
