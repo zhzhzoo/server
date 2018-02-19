@@ -221,31 +221,31 @@ insert into t1 (x) values (1),(2),(3),(4),(5),(6),(7),(8),(9);
 update t1 set y=x;
 explain select * from t1, t1 t2 where t1.y = 8 and t2.x between 7 and t1.y+0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	2	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select * from t1, t1 t2 where t1.y = 8 and t2.x >= 7 and t2.x <= t1.y+0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	2	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select * from t1, t1 t2 where t1.y = 2 and t2.x between t1.y-1 and t1.y+1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	3	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select * from t1, t1 t2 where t1.y = 2 and t2.x >= t1.y-1 and t2.x <= t1.y+1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	3	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select * from t1, t1 t2 where t1.y = 2 and t2.x between 0 and t1.y;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	2	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select * from t1, t1 t2 where t1.y = 2 and t2.x >= 0 and t2.x <= t1.y;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	y	y	5	const	1	
+1	SIMPLE	t1	ref	y	y	5	const	1	Using index condition
 1	SIMPLE	t2	range	x	x	5	NULL	2	Using index condition; Using where; Rowid-ordered scan; Using join buffer (flat, BNL join)
 explain select count(*) from t1 where x in (1);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t1	ref	x	x	5	const	1	Using index
+1	SIMPLE	t1	ref	x	x	5	const	1	Using where; Using index
 explain select count(*) from t1 where x in (1,2);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	index	x	x	5	NULL	9	Using where; Using index
@@ -256,12 +256,12 @@ CREATE TABLE t2 (keya int(11) NOT NULL default '0', KEY j1 (keya));
 INSERT INTO t2 VALUES (0),(0),(1),(1),(2),(2);
 explain select * from t1, t2 where (t1.key1 <t2.keya + 1) and t2.keya=3;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ref	j1	j1	4	const	1	Using index
+1	SIMPLE	t2	ref	j1	j1	4	const	1	Using where; Using index
 1	SIMPLE	t1	index	i1	i1	4	NULL	7	Using where; Using index; Using join buffer (flat, BNL join)
 explain select * from t1 force index(i1), t2 force index(j1) where 
 (t1.key1 <t2.keya + 1) and t2.keya=3;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ref	j1	j1	4	const	1	Using index
+1	SIMPLE	t2	ref	j1	j1	4	const	1	Using where; Using index
 1	SIMPLE	t1	index	i1	i1	4	NULL	7	Using where; Using index; Using join buffer (flat, BNL join)
 DROP TABLE t1,t2;
 CREATE TABLE t1 (
@@ -423,19 +423,19 @@ test.t2	analyze	status	Table is already up to date
 explain select * from t1, t2  where t1.uid=t2.uid AND t1.uid > 0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	uid_index	uid_index	4	NULL	112	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	uid_index	uid_index	4	test.t1.uid	38	
+1	SIMPLE	t2	hash_range	uid_index	#hash#uid_index:uid_index	4:4	test.t1.uid	112	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain select * from t1, t2  where t1.uid=t2.uid AND t2.uid > 0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	uid_index	uid_index	4	NULL	112	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	uid_index	uid_index	4	test.t1.uid	38	
+1	SIMPLE	t2	hash_range	uid_index	#hash#uid_index:uid_index	4:4	test.t1.uid	112	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain select * from t1, t2  where t1.uid=t2.uid AND t1.uid != 0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	uid_index	uid_index	4	NULL	113	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	uid_index	uid_index	4	test.t1.uid	38	
+1	SIMPLE	t2	hash_range	uid_index	#hash#uid_index:uid_index	4:4	test.t1.uid	113	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain select * from t1, t2  where t1.uid=t2.uid AND t2.uid != 0;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	uid_index	uid_index	4	NULL	113	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	uid_index	uid_index	4	test.t1.uid	38	
+1	SIMPLE	t2	hash_range	uid_index	#hash#uid_index:uid_index	4:4	test.t1.uid	113	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 select * from t1, t2  where t1.uid=t2.uid AND t1.uid > 0;
 id	name	uid	id	name	uid
 1001	A	1	1001	A	1
@@ -1767,14 +1767,14 @@ EXPLAIN
 SELECT * FROM t1, t1 as t2 WHERE t2.pk BETWEEN t1.i4 AND t1.i4;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ALL	i4_uq	NULL	NULL	NULL	3	
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t1.i4	1	Using index condition
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t1.i4	3	Using where; Using join buffer (flat, BNLH join)
 SELECT * FROM t1, t1 as t2 WHERE t2.pk BETWEEN t1.i4 AND t1.i4;
 pk	i4	pk	i4
 EXPLAIN
 SELECT * FROM t1, t1 as t2 WHERE t1.i4 BETWEEN t2.pk AND t2.pk;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ALL	i4_uq	NULL	NULL	NULL	3	
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t1.i4	1	Using index condition
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t1.i4	3	Using where; Using join buffer (flat, BNLH join)
 SELECT * FROM t1, t1 as t2 WHERE t1.i4 BETWEEN t2.pk AND t2.pk;
 pk	i4	pk	i4
 DROP TABLE t1;
@@ -2487,7 +2487,7 @@ explain select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(2,2));
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t2	range	idx1,idx2	idx1	5	NULL	3	Using index condition; Using where; Rowid-ordered scan
-1	SIMPLE	t1	ref	idx	idx	5	test.t2.d	8	
+1	SIMPLE	t1	hash_range	idx	#hash#idx:idx	5:5	test.t2.d	11	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(2,2));
 EXPLAIN
@@ -2507,38 +2507,45 @@ EXPLAIN
       "attached_condition": "(t2.d,t2.e) in (<cache>((3,3)),<cache>((7,7)),<cache>((2,2)))",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t1",
-      "access_type": "ref",
-      "possible_keys": ["idx"],
-      "key": "idx",
-      "key_length": "5",
-      "used_key_parts": ["a"],
-      "ref": ["test.t2.d"],
-      "rows": 8,
-      "filtered": 100
+    "block-nl-join": {
+      "table": {
+        "table_name": "t1",
+        "access_type": "hash_range",
+        "possible_keys": ["idx"],
+        "key": "#hash#idx:idx",
+        "key_length": "5:5",
+        "used_key_parts": ["a"],
+        "ref": ["test.t2.d"],
+        "rows": 11,
+        "filtered": 72.727,
+        "index_condition": "1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH"
     }
   }
 }
 select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(2,2));
 a	b	c	d	e	f
-3	2	uuuw	3	3	i
-3	2	uuua	3	3	i
-3	3	zzzz	3	3	i
-3	3	zyxw	3	3	i
-3	3	zzza	3	3	i
-3	3	zyxa	3	3	i
-2	1	w	2	2	da
-2	1	wb	2	2	da
 2	2	yyy	2	2	da
+3	3	zzzz	3	3	i
+2	3	yy	2	2	da
+2	1	w	2	2	da
+2	3	ww	2	2	da
+3	3	zyxw	3	3	i
+3	2	uuuw	3	3	i
 2	2	wxz	2	2	da
 2	2	yya	2	2	da
-2	2	wxa	2	2	da
-2	3	yy	2	2	da
-2	3	ww	2	2	da
+3	3	zzza	3	3	i
 2	3	ya	2	2	da
+2	1	wb	2	2	da
 2	3	wa	2	2	da
+3	3	zyxa	3	3	i
+3	2	uuua	3	3	i
+2	2	wxa	2	2	da
 insert into t2 values
 (4,5,'a'), (7,8,'b'), (4,3,'c'), (1,2,'d'), (2,1,'e'), (5,5,'f'),
 (2,3,'g'), (7,7,'h'), (3,3,'i'), (3,2,'j'), (2,2,'k'), (5,5,'l'),
@@ -2560,7 +2567,7 @@ explain select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(8,8)) and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	idx	idx	5	NULL	6	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	idx1,idx2	idx1	5	test.t1.a	12	Using where
+1	SIMPLE	t2	hash_range	idx1,idx2	#hash#idx1:idx1	5:5	test.t1.a	8	Using where; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(8,8)) and length(f) = 1;
 EXPLAIN
@@ -2579,17 +2586,24 @@ EXPLAIN
       "index_condition": "t1.a is not null",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t2",
-      "access_type": "ref",
-      "possible_keys": ["idx1", "idx2"],
-      "key": "idx1",
-      "key_length": "5",
-      "used_key_parts": ["d"],
-      "ref": ["test.t1.a"],
-      "rows": 12,
-      "filtered": 100,
-      "attached_condition": "(t1.a,t2.e) in (<cache>((3,3)),<cache>((7,7)),<cache>((8,8))) and octet_length(t2.f) = 1"
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "hash_range",
+        "possible_keys": ["idx1", "idx2"],
+        "key": "#hash#idx1:idx1",
+        "key_length": "5:5",
+        "used_key_parts": ["d"],
+        "ref": ["test.t1.a"],
+        "rows": 8,
+        "filtered": 100,
+        "attached_condition": "octet_length(t2.f) = 1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH",
+      "attached_condition": "(t1.a,t2.e) in (<cache>((3,3)),<cache>((7,7)),<cache>((8,8)))"
     }
   }
 }
@@ -2597,58 +2611,58 @@ select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(8,8)) and length(f) = 1;
 a	b	c	d	e	f
 3	3	zzzz	3	3	i
-3	3	zzzz	3	3	i
-7	8	xxxxx	7	7	h
-7	7	xxxyy	7	7	h
-3	3	zyxw	3	3	i
 3	3	zyxw	3	3	i
 3	2	uuuw	3	3	i
-3	2	uuuw	3	3	i
 3	3	zzza	3	3	i
-3	3	zzza	3	3	i
-7	8	xxxxa	7	7	h
-7	7	xxxya	7	7	h
-3	3	zyxa	3	3	i
 3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
+7	8	xxxxx	7	7	h
+7	7	xxxyy	7	7	h
+7	8	xxxxa	7	7	h
+7	7	xxxya	7	7	h
+3	3	zzzz	3	3	i
+3	3	zyxw	3	3	i
+3	2	uuuw	3	3	i
+3	3	zzza	3	3	i
+3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
 prepare stmt from "select * from t1,t2
 where a = d and (a,e) in ((3,3),(7,7),(8,8)) and length(f) = 1";
 execute stmt;
 a	b	c	d	e	f
 3	3	zzzz	3	3	i
-3	3	zzzz	3	3	i
-7	8	xxxxx	7	7	h
-7	7	xxxyy	7	7	h
-3	3	zyxw	3	3	i
 3	3	zyxw	3	3	i
 3	2	uuuw	3	3	i
-3	2	uuuw	3	3	i
 3	3	zzza	3	3	i
-3	3	zzza	3	3	i
-7	8	xxxxa	7	7	h
-7	7	xxxya	7	7	h
-3	3	zyxa	3	3	i
 3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
+7	8	xxxxx	7	7	h
+7	7	xxxyy	7	7	h
+7	8	xxxxa	7	7	h
+7	7	xxxya	7	7	h
+3	3	zzzz	3	3	i
+3	3	zyxw	3	3	i
+3	2	uuuw	3	3	i
+3	3	zzza	3	3	i
+3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
 execute stmt;
 a	b	c	d	e	f
 3	3	zzzz	3	3	i
-3	3	zzzz	3	3	i
-7	8	xxxxx	7	7	h
-7	7	xxxyy	7	7	h
-3	3	zyxw	3	3	i
 3	3	zyxw	3	3	i
 3	2	uuuw	3	3	i
-3	2	uuuw	3	3	i
 3	3	zzza	3	3	i
-3	3	zzza	3	3	i
-7	8	xxxxa	7	7	h
-7	7	xxxya	7	7	h
-3	3	zyxa	3	3	i
 3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
+7	8	xxxxx	7	7	h
+7	7	xxxyy	7	7	h
+7	8	xxxxa	7	7	h
+7	7	xxxya	7	7	h
+3	3	zzzz	3	3	i
+3	3	zyxw	3	3	i
+3	2	uuuw	3	3	i
+3	3	zzza	3	3	i
+3	3	zyxa	3	3	i
 3	2	uuua	3	3	i
 deallocate prepare stmt;
 insert into t1 select * from t1;
@@ -2658,7 +2672,7 @@ explain select * from t1,t2
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t2	range	idx1,idx2	idx2	5	NULL	6	Using where; Rowid-ordered scan
-1	SIMPLE	t1	ref	idx	idx	5	test.t2.d	11	
+1	SIMPLE	t1	hash_range	idx	#hash#idx:idx	5:5	test.t2.d	15	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2 
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 EXPLAIN
@@ -2677,30 +2691,37 @@ EXPLAIN
       "attached_condition": "(t2.d,t2.e) in (<cache>((4,4)),<cache>((7,7)),<cache>((8,8))) and octet_length(t2.f) = 1 and t2.d is not null",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t1",
-      "access_type": "ref",
-      "possible_keys": ["idx"],
-      "key": "idx",
-      "key_length": "5",
-      "used_key_parts": ["a"],
-      "ref": ["test.t2.d"],
-      "rows": 11,
-      "filtered": 100
+    "block-nl-join": {
+      "table": {
+        "table_name": "t1",
+        "access_type": "hash_range",
+        "possible_keys": ["idx"],
+        "key": "#hash#idx:idx",
+        "key_length": "5:5",
+        "used_key_parts": ["a"],
+        "ref": ["test.t2.d"],
+        "rows": 15,
+        "filtered": 73.333,
+        "index_condition": "1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH"
     }
   }
 }
 select * from t1,t2 
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 a	b	c	d	e	f
+7	8	xxxxx	7	7	h
 7	7	xxxyy	7	7	h
-7	7	xxxya	7	7	h
-7	7	xxxyy	7	7	h
+7	8	xxxxa	7	7	h
 7	7	xxxya	7	7	h
 7	8	xxxxx	7	7	h
+7	7	xxxyy	7	7	h
 7	8	xxxxa	7	7	h
-7	8	xxxxx	7	7	h
-7	8	xxxxa	7	7	h
+7	7	xxxya	7	7	h
 alter table t2 drop index idx1, drop index idx2, add index idx3(d,e);
 # join order: (t2,t1) with ref access of t1
 # range access to t2 by 2-component keys for index idx3
@@ -2708,7 +2729,7 @@ explain select * from t1,t2
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t2	range	idx3	idx3	10	NULL	5	Using index condition; Using where; Rowid-ordered scan
-1	SIMPLE	t1	ref	idx	idx	5	test.t2.d	11	
+1	SIMPLE	t1	hash_range	idx	#hash#idx:idx	5:5	test.t2.d	15	Using index condition; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2 
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 EXPLAIN
@@ -2728,37 +2749,44 @@ EXPLAIN
       "attached_condition": "(t2.d,t2.e) in (<cache>((4,4)),<cache>((7,7)),<cache>((8,8))) and octet_length(t2.f) = 1",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t1",
-      "access_type": "ref",
-      "possible_keys": ["idx"],
-      "key": "idx",
-      "key_length": "5",
-      "used_key_parts": ["a"],
-      "ref": ["test.t2.d"],
-      "rows": 11,
-      "filtered": 100
+    "block-nl-join": {
+      "table": {
+        "table_name": "t1",
+        "access_type": "hash_range",
+        "possible_keys": ["idx"],
+        "key": "#hash#idx:idx",
+        "key_length": "5:5",
+        "used_key_parts": ["a"],
+        "ref": ["test.t2.d"],
+        "rows": 15,
+        "filtered": 73.333,
+        "index_condition": "1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH"
     }
   }
 }
 select * from t1,t2 
 where a = d and (a,e) in ((4,4),(7,7),(8,8)) and length(f) = 1;
 a	b	c	d	e	f
+7	8	xxxxx	7	7	h
 7	7	xxxyy	7	7	h
-7	7	xxxya	7	7	h
-7	7	xxxyy	7	7	h
+7	8	xxxxa	7	7	h
 7	7	xxxya	7	7	h
 7	8	xxxxx	7	7	h
+7	7	xxxyy	7	7	h
 7	8	xxxxa	7	7	h
-7	8	xxxxx	7	7	h
-7	8	xxxxa	7	7	h
+7	7	xxxya	7	7	h
 # join order: (t1,t2) with ref access of t2
 # range access to t1 by 1-component keys for index idx
 explain select * from t1,t2
 where a = d and (a,e) in ((4,d+1),(7,d+1),(8,d+1)) and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	idx	idx	5	NULL	15	Using index condition; Rowid-ordered scan
-1	SIMPLE	t2	ref	idx3	idx3	5	test.t1.a	3	Using where
+1	SIMPLE	t2	hash_range	idx3	#hash#idx3:idx3	5:5	test.t1.a	11	Using where; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2
 where a = d and (a,e) in ((4,d+1),(7,d+1),(8,d+1)) and length(f) = 1;
 EXPLAIN
@@ -2777,17 +2805,24 @@ EXPLAIN
       "index_condition": "t1.a is not null",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t2",
-      "access_type": "ref",
-      "possible_keys": ["idx3"],
-      "key": "idx3",
-      "key_length": "5",
-      "used_key_parts": ["d"],
-      "ref": ["test.t1.a"],
-      "rows": 3,
-      "filtered": 100,
-      "attached_condition": "(t1.a,t2.e) in ((4,t1.a + 1),(7,t1.a + 1),(8,t1.a + 1)) and octet_length(t2.f) = 1"
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "hash_range",
+        "possible_keys": ["idx3"],
+        "key": "#hash#idx3:idx3",
+        "key_length": "5:5",
+        "used_key_parts": ["d"],
+        "ref": ["test.t1.a"],
+        "rows": 11,
+        "filtered": 27.273,
+        "attached_condition": "octet_length(t2.f) = 1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH",
+      "attached_condition": "(t1.a,t2.e) in ((4,t1.a + 1),(7,t1.a + 1),(8,t1.a + 1))"
     }
   }
 }
@@ -2795,20 +2830,20 @@ select * from t1,t2
 where a = d and (a,e) in ((4,d+1),(7,d+1),(8,d+1)) and length(f) = 1;
 a	b	c	d	e	f
 4	5	ww	4	5	a
-7	8	xxxxx	7	8	b
 4	3	zyx	4	5	a
-7	7	xxxyy	7	8	b
 4	5	wa	4	5	a
-7	8	xxxxa	7	8	b
 4	3	zya	4	5	a
-7	7	xxxya	7	8	b
 4	5	ww	4	5	a
-7	8	xxxxx	7	8	b
 4	3	zyx	4	5	a
-7	7	xxxyy	7	8	b
 4	5	wa	4	5	a
-7	8	xxxxa	7	8	b
 4	3	zya	4	5	a
+7	8	xxxxx	7	8	b
+7	7	xxxyy	7	8	b
+7	8	xxxxa	7	8	b
+7	7	xxxya	7	8	b
+7	8	xxxxx	7	8	b
+7	7	xxxyy	7	8	b
+7	8	xxxxa	7	8	b
 7	7	xxxya	7	8	b
 # join order: (t1,t2) with ref access of t2
 # no range access
@@ -2816,7 +2851,7 @@ explain select * from t1,t2
 where a = d and (a,e) in ((e,d+1),(7,7),(8,8)) and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ALL	idx	NULL	NULL	NULL	144	Using where
-1	SIMPLE	t2	ref	idx3	idx3	5	test.t1.a	3	Using where
+1	SIMPLE	t2	hash_ALL	idx3	#hash#idx3	5	test.t1.a	104	Using where; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2
 where a = d and (a,e) in ((e,d+1),(7,7),(8,8)) and length(f) = 1;
 EXPLAIN
@@ -2831,17 +2866,23 @@ EXPLAIN
       "filtered": 100,
       "attached_condition": "t1.a is not null"
     },
-    "table": {
-      "table_name": "t2",
-      "access_type": "ref",
-      "possible_keys": ["idx3"],
-      "key": "idx3",
-      "key_length": "5",
-      "used_key_parts": ["d"],
-      "ref": ["test.t1.a"],
-      "rows": 3,
-      "filtered": 100,
-      "attached_condition": "(t1.a,t2.e) in ((t2.e,t1.a + 1),<cache>((7,7)),<cache>((8,8))) and octet_length(t2.f) = 1"
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "hash_ALL",
+        "possible_keys": ["idx3"],
+        "key": "#hash#idx3",
+        "key_length": "5",
+        "used_key_parts": ["d"],
+        "ref": ["test.t1.a"],
+        "rows": 104,
+        "filtered": 2.8846,
+        "attached_condition": "octet_length(t2.f) = 1"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH",
+      "attached_condition": "(t1.a,t2.e) in ((t2.e,t1.a + 1),<cache>((7,7)),<cache>((8,8)))"
     }
   }
 }
@@ -2863,7 +2904,7 @@ where a = d and (a,2) in ((2,2),(7,7),(8,8)) and
 length(c) = 1 and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	range	idx	idx	5	NULL	13	Using index condition; Using where; Rowid-ordered scan
-1	SIMPLE	t2	ref	idx3	idx3	5	test.t1.a	3	Using where
+1	SIMPLE	t2	hash_range	idx3	#hash#idx3:idx3	5:5	test.t1.a	9	Using where; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2
 where a = d and (a,2) in ((2,2),(7,7),(8,8)) and
 length(c) = 1 and length(f) = 1;
@@ -2884,17 +2925,23 @@ EXPLAIN
       "attached_condition": "(t1.a,2) in (<cache>((2,2)),<cache>((7,7)),<cache>((8,8))) and octet_length(t1.c) = 1",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t2",
-      "access_type": "ref",
-      "possible_keys": ["idx3"],
-      "key": "idx3",
-      "key_length": "5",
-      "used_key_parts": ["d"],
-      "ref": ["test.t1.a"],
-      "rows": 3,
-      "filtered": 100,
-      "attached_condition": "octet_length(t2.f) = 1"
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "hash_range",
+        "possible_keys": ["idx3"],
+        "key": "#hash#idx3:idx3",
+        "key_length": "5:5",
+        "used_key_parts": ["d"],
+        "ref": ["test.t1.a"],
+        "rows": 9,
+        "filtered": 33.333,
+        "attached_condition": "octet_length(t2.f) = 1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH"
     }
   }
 }
@@ -2903,30 +2950,30 @@ where a = d and (a,2) in ((2,2),(7,7),(8,8)) and
 length(c) = 1 and length(f) = 1;
 a	b	c	d	e	f
 2	1	w	2	1	e
-2	1	w	2	2	k
-2	1	w	2	3	g
 2	1	w	2	1	e
-2	1	w	2	2	k
 2	1	w	2	3	g
+2	1	w	2	3	g
+2	1	w	2	2	k
+2	1	w	2	2	k
 prepare stmt from "select * from t1,t2
 where a = d and (a,2) in ((2,2),(7,7),(8,8)) and
 length(c) = 1 and length(f) = 1";
 execute stmt;
 a	b	c	d	e	f
 2	1	w	2	1	e
-2	1	w	2	2	k
-2	1	w	2	3	g
 2	1	w	2	1	e
-2	1	w	2	2	k
 2	1	w	2	3	g
+2	1	w	2	3	g
+2	1	w	2	2	k
+2	1	w	2	2	k
 execute stmt;
 a	b	c	d	e	f
 2	1	w	2	1	e
-2	1	w	2	2	k
-2	1	w	2	3	g
 2	1	w	2	1	e
-2	1	w	2	2	k
 2	1	w	2	3	g
+2	1	w	2	3	g
+2	1	w	2	2	k
+2	1	w	2	2	k
 deallocate prepare stmt;
 create table t3 (id int primary key, v int) engine=myisam;
 insert into t3 values
@@ -2940,7 +2987,7 @@ length(c) = 1 and length(f) = 1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t3	const	PRIMARY	PRIMARY	4	const	1	
 1	SIMPLE	t1	range	idx	idx	5	NULL	13	Using index condition; Using where; Rowid-ordered scan
-1	SIMPLE	t2	ref	idx3	idx3	5	test.t1.a	3	Using where
+1	SIMPLE	t2	hash_range	idx3	#hash#idx3:idx3	5:5	test.t1.a	9	Using where; Rowid-ordered scan; Using join buffer (flat, BNLH join)
 explain format=json select * from t1,t2,t3
 where id = 1 and a = d and
 (a,v+1) in ((2,2),(7,7),(8,8)) and
@@ -2973,17 +3020,23 @@ EXPLAIN
       "attached_condition": "(t1.a,1 + 1) in (<cache>((2,2)),<cache>((7,7)),<cache>((8,8))) and octet_length(t1.c) = 1",
       "mrr_type": "Rowid-ordered scan"
     },
-    "table": {
-      "table_name": "t2",
-      "access_type": "ref",
-      "possible_keys": ["idx3"],
-      "key": "idx3",
-      "key_length": "5",
-      "used_key_parts": ["d"],
-      "ref": ["test.t1.a"],
-      "rows": 3,
-      "filtered": 100,
-      "attached_condition": "octet_length(t2.f) = 1"
+    "block-nl-join": {
+      "table": {
+        "table_name": "t2",
+        "access_type": "hash_range",
+        "possible_keys": ["idx3"],
+        "key": "#hash#idx3:idx3",
+        "key_length": "5:5",
+        "used_key_parts": ["d"],
+        "ref": ["test.t1.a"],
+        "rows": 9,
+        "filtered": 33.333,
+        "attached_condition": "octet_length(t2.f) = 1",
+        "mrr_type": "Rowid-ordered scan"
+      },
+      "buffer_type": "flat",
+      "buffer_size": "256Kb",
+      "join_type": "BNLH"
     }
   }
 }
@@ -2993,11 +3046,11 @@ where id = 1 and a = d and
 length(c) = 1 and length(f) = 1;
 a	b	c	d	e	f	id	v
 2	1	w	2	1	e	1	1
-2	1	w	2	2	k	1	1
-2	1	w	2	3	g	1	1
 2	1	w	2	1	e	1	1
-2	1	w	2	2	k	1	1
 2	1	w	2	3	g	1	1
+2	1	w	2	3	g	1	1
+2	1	w	2	2	k	1	1
+2	1	w	2	2	k	1	1
 # IN predicate is always FALSE
 explain select * from t1,t2,t3
 where id = 1 and a = d and

@@ -377,13 +377,13 @@ a	b
 EXPLAIN SELECT * FROM t1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM t1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	4.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	4.00	100.00	100.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the inner view
 # Expectation: Can run everything
@@ -433,11 +433,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 EXPLAIN UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	20	Using where
 ANALYZE UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	20	20.00	100.00	0.00	Using where
 DELETE FROM v1;
 EXPLAIN DELETE FROM v1;
@@ -465,11 +465,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 EXPLAIN DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	8	Using where
 ANALYZE DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	8	8.00	100.00	0.00	Using where
 SELECT * FROM v1;
 a	b
@@ -492,13 +492,13 @@ a	b
 EXPLAIN SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the outer view
 # Expectation: Can run everything
@@ -599,12 +599,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	12	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	12	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	12	12.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	12	12.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #========================================================================
@@ -1533,11 +1533,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 EXPLAIN UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	Using where
 ANALYZE UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	16.00	100.00	0.00	Using where
 DELETE FROM v1;
 EXPLAIN DELETE FROM v1;
@@ -1565,11 +1565,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 EXPLAIN DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	4	Using where
 ANALYZE DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	4	4.00	100.00	0.00	Using where
 SELECT * FROM v1;
 a	b
@@ -1592,13 +1592,13 @@ a	b
 EXPLAIN SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	4.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	4.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the outer view
 # Expectation: Can run everything: SELECT access to the column `a` 
@@ -1709,12 +1709,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #========================================================================
@@ -1774,11 +1774,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 UPDATE t1, t2 SET t1.a = t1.a + 1 WHERE t1.a = t2.a;
 EXPLAIN UPDATE t1, t2 SET t1.a = t1.a + 1 WHERE t1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	24	Using where
 ANALYZE UPDATE t1, t2 SET t1.a = t1.a + 1 WHERE t1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	24	24.00	100.00	0.00	Using where
 DELETE FROM t1;
 EXPLAIN DELETE FROM t1;
@@ -1882,11 +1882,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 EXPLAIN UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	Using where
 ANALYZE UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	16.00	100.00	0.00	Using where
 DELETE FROM v1;
 EXPLAIN DELETE FROM v1;
@@ -1914,11 +1914,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 EXPLAIN DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	4	Using where
 ANALYZE DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	4	4.00	100.00	0.00	Using where
 SELECT * FROM v1;
 a	b
@@ -1941,13 +1941,13 @@ a	b
 EXPLAIN SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	4.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	4	4.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the outer view
 # Expectation: Can run everything
@@ -2049,12 +2049,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	8	8.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #########################################################################
@@ -2698,13 +2698,13 @@ a	b
 EXPLAIN SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	14	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	14	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	14	14.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	14	14.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the outer view
 # Expectation: Can run everything
@@ -2805,12 +2805,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	18	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	18	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	18	18.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	18	18.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #========================================================================
@@ -3929,11 +3929,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 EXPLAIN UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	47	Using where
 ANALYZE UPDATE v1, t2 SET v1.a = v1.a + 1 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	47	47.00	100.00	0.00	Using where
 DELETE FROM v1;
 EXPLAIN DELETE FROM v1;
@@ -3961,11 +3961,11 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_f
 DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 EXPLAIN DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	35	Using where
 ANALYZE DELETE FROM v1 USING v1, t2 WHERE v1.a = t2.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
-1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	SIMPLE	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	35	35.00	100.00	0.00	Using where
 SELECT * FROM v1;
 a	b
@@ -3988,13 +3988,13 @@ a	b
 EXPLAIN SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	35	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	35	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v1 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	35	35.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
-2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	35	35.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
+2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 #------------------------------------------------------------------------
 # I/R/U/D/S on the outer view
 # Expectation: Can run everything
@@ -4095,12 +4095,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	39	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	39	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	39	39.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	39	39.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #########################################################################
@@ -4615,12 +4615,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	39	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	39	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	39	39.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	39	39.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 
 #========================================================================
@@ -5222,12 +5222,12 @@ a	b
 EXPLAIN SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	44	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	44	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	Using where
 ANALYZE SELECT * FROM v2 WHERE a IN ( SELECT a FROM t2 );
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	r_rows	filtered	r_filtered	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	3.00	100.00	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	44	44.00	100.00	0.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	privtest_db.t2.a	44	44.00	100.00	0.00	Using where; Using join buffer (flat, BNLH join)
 2	MATERIALIZED	t2	ALL	NULL	NULL	NULL	NULL	3	3.00	100.00	100.00	Using where
 disconnect con1;
 connection default;

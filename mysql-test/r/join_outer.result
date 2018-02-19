@@ -2075,7 +2075,7 @@ WHERE t1.pk BETWEEN 5 AND 6 AND t1.b IS NULL OR t1.b = 5
 ORDER BY t1.b;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ref	idx	idx	4	const	2	100.00	Using where
-1	SIMPLE	t2	ref	c	c	5	test.t1.a	2	100.00	
+1	SIMPLE	t2	hash_ALL	c	#hash#c	5	test.t1.a	16	12.50	Using join buffer (flat, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`b` AS `b`,`test`.`t2`.`c` AS `c`,`test`.`t2`.`d` AS `d` from `test`.`t2` join `test`.`t1` where `test`.`t2`.`c` = `test`.`t1`.`a` and `test`.`t1`.`b` = 5 order by `test`.`t1`.`b`
 SELECT t1.b, t2.c, t2.d FROM t2 JOIN t1 ON t2.c = t1.a
@@ -2083,8 +2083,8 @@ WHERE t1.pk BETWEEN 5 AND 6 AND t1.b IS NULL OR t1.b = 5
 ORDER BY t1.b;
 b	c	d
 5	8	88
-5	8	81
 5	8	88
+5	8	81
 5	8	81
 EXPLAIN EXTENDED
 SELECT t1.b, t2.c, t2.d FROM t2 LEFT JOIN t1 ON t2.c = t1.a
@@ -2092,7 +2092,7 @@ WHERE t1.pk BETWEEN 5 AND 6 AND t1.b IS NULL OR t1.b = 5
 ORDER BY t1.b;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ref	PRIMARY,idx	idx	4	const	2	100.00	Using where
-1	SIMPLE	t2	ref	c	c	5	test.t1.a	2	100.00	
+1	SIMPLE	t2	hash_ALL	c	#hash#c	5	test.t1.a	16	12.50	Using join buffer (flat, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`b` AS `b`,`test`.`t2`.`c` AS `c`,`test`.`t2`.`d` AS `d` from `test`.`t2` join `test`.`t1` where `test`.`t2`.`c` = `test`.`t1`.`a` and `test`.`t1`.`b` = 5 order by `test`.`t1`.`b`
 SELECT t1.b, t2.c, t2.d FROM t2 LEFT JOIN t1 ON t2.c = t1.a
@@ -2100,8 +2100,8 @@ WHERE t1.pk BETWEEN 5 AND 6 AND t1.b IS NULL OR t1.b = 5
 ORDER BY t1.b;
 b	c	d
 5	8	88
-5	8	81
 5	8	88
+5	8	81
 5	8	81
 DROP TABLE t1,t2;
 #
@@ -2129,15 +2129,15 @@ insert into t1 select A.a + 10*B.a from t0 A, t0 B;
 explain select * from t1 left join t0 on t0.a=t1.pk where t0.person_id='fooo' or 'xyz' IS NULL;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t0	ALL	NULL	NULL	NULL	NULL	10	Using where
-1	SIMPLE	t1	eq_ref	PRIMARY	PRIMARY	4	test.t0.a	1	Using index
+1	SIMPLE	t1	hash_index	PRIMARY	#hash#PRIMARY:PRIMARY	4:4	test.t0.a	100	Using index; Using join buffer (flat, BNLH join)
 explain select * from t1 left join t0 on t0.a=t1.pk where t0.person_id='fooo';
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t0	ALL	NULL	NULL	NULL	NULL	10	Using where
-1	SIMPLE	t1	eq_ref	PRIMARY	PRIMARY	4	test.t0.a	1	Using index
+1	SIMPLE	t1	hash_index	PRIMARY	#hash#PRIMARY:PRIMARY	4:4	test.t0.a	100	Using index; Using join buffer (flat, BNLH join)
 explain select * from t1 left join t0 on t0.a=t1.pk where t0.person_id='fooo' or t0.person_id='bar';
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t0	ALL	NULL	NULL	NULL	NULL	10	Using where
-1	SIMPLE	t1	eq_ref	PRIMARY	PRIMARY	4	test.t0.a	1	Using index
+1	SIMPLE	t1	hash_index	PRIMARY	#hash#PRIMARY:PRIMARY	4:4	test.t0.a	100	Using index; Using join buffer (flat, BNLH join)
 drop table t0, t1;
 #
 # MDEV-4836: Wrong result on <not null date column> IS NULL (old documented hack stopped working)
@@ -2313,9 +2313,9 @@ LEFT JOIN t3 on t2.i2 = t3.i3
 ) as w1 
 WHERE v3 = 4;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t3	ref	PRIMARY,v3	v3	5	const	1	100.00	
-1	SIMPLE	t1	eq_ref	PRIMARY	PRIMARY	4	test.t3.i3	1	100.00	
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t3.i3	1	100.00	
+1	SIMPLE	t3	ref	PRIMARY,v3	v3	5	const	1	100.00	Using index condition
+1	SIMPLE	t1	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t3.i3	9	11.11	Using join buffer (flat, BNLH join)
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t3.i3	9	11.11	Using join buffer (incremental, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`i1` AS `i1`,`test`.`t1`.`v1` AS `v1`,`test`.`t2`.`i2` AS `i2`,`test`.`t2`.`v2` AS `v2`,`test`.`t3`.`i3` AS `i3`,`test`.`t3`.`v3` AS `v3` from `test`.`t1` join `test`.`t2` join `test`.`t3` where `test`.`t3`.`v3` = 4 and `test`.`t1`.`i1` = `test`.`t3`.`i3` and `test`.`t2`.`i2` = `test`.`t3`.`i3`
 # This should have the same join order like the query above:
@@ -2331,9 +2331,9 @@ AND 1 = 1
 ) as w2 
 WHERE v3 = 4;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	SIMPLE	t3	ref	PRIMARY,v3	v3	5	const	1	100.00	
-1	SIMPLE	t1	eq_ref	PRIMARY	PRIMARY	4	test.t3.i3	1	100.00	
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t3.i3	1	100.00	
+1	SIMPLE	t3	ref	PRIMARY,v3	v3	5	const	1	100.00	Using index condition
+1	SIMPLE	t1	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t3.i3	9	11.11	Using join buffer (flat, BNLH join)
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t3.i3	9	11.11	Using join buffer (incremental, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`i1` AS `i1`,`test`.`t1`.`v1` AS `v1`,`test`.`t2`.`i2` AS `i2`,`test`.`t2`.`v2` AS `v2`,`test`.`t3`.`i3` AS `i3`,`test`.`t3`.`v3` AS `v3` from `test`.`t1` join `test`.`t2` join `test`.`t3` where `test`.`t3`.`v3` = 4 and `test`.`t1`.`i1` = `test`.`t3`.`i3` and `test`.`t2`.`i2` = `test`.`t3`.`i3`
 drop table t1,t2,t3;

@@ -66,7 +66,7 @@ a	b	c	a	b	c
 explain select * from t1,t3 where t1.c=t3.c and t3.c=-1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t3	const	c	c	5	const	1	
-1	SIMPLE	t1	ref	c	c	5	const	2	
+1	SIMPLE	t1	ref	c	c	5	const	2	Using index condition
 # select_type=PRIMARY, type=index,ALL
 select * from t1 where b in (select c from t3);
 a	b	c
@@ -76,8 +76,8 @@ a	b	c
 3	-3	-3
 explain select * from t1 where b in (select c from t3);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
-1	PRIMARY	t3	index	c	c	5	NULL	3	Using index
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	5	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t3	index	c	c	5	NULL	3	Using where; Using index
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	test.t3.c	5	Using where; Using join buffer (flat, BNLH join)
 # select_type=PRIMARY, type=range,ref
 select * from t1 where c in (select c from t3 where c between -2 and -1);
 a	b	c
@@ -87,7 +87,7 @@ a	b	c
 explain select * from t1 where c in (select c from t3 where c between -2 and -1);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	t3	index	c	c	5	NULL	3	Using where; Using index
-1	PRIMARY	t1	ref	c	c	5	test.t3.c	1	
+1	PRIMARY	t1	hash_range	c	#hash#c:c	5:5	test.t3.c	2	Using index condition; Using join buffer (flat, BNLH join)
 # select_type=UNION, type=system
 # select_type=UNION RESULT, type=<union1,2>
 select * from t1 union select * from t2;
@@ -589,7 +589,7 @@ FROM (c AS subquery2_t1 RIGHT JOIN
 ORDER BY subquery2_field1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	subquery2_t2	index	NULL	col_int_key_2	10	NULL	20	#
-1	SIMPLE	subquery2_t3	ALL	NULL	NULL	NULL	NULL	20	#
+1	SIMPLE	subquery2_t3	hash_ALL	NULL	#hash#$hj	4	test.subquery2_t2.col_int_key	20	#
 1	SIMPLE	subquery2_t1	index	NULL	PRIMARY	4	NULL	20	#
 SELECT subquery2_t2.col_int_key AS subquery2_field1
 FROM (c AS subquery2_t1 RIGHT JOIN
@@ -875,7 +875,7 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	table2	ALL	PRIMARY,col_int_key,col_int_key_2	NULL	NULL	NULL	19	#
 1	PRIMARY	<derived2>	ref	key0	key0	9	test.table2.pk,test.table2.col_int_key	10	#
 2	DERIVED	SUBQUERY1_t2	ALL	PRIMARY,col_int_key,col_varchar_key,col_int_key_2	NULL	NULL	NULL	19	#
-2	DERIVED	SUBQUERY1_t3	ref	PRIMARY,col_varchar_key	col_varchar_key	5	test.SUBQUERY1_t2.col_varchar_key	1	#
+2	DERIVED	SUBQUERY1_t3	hash_ALL	PRIMARY,col_varchar_key	#hash#col_varchar_key	5	test.SUBQUERY1_t2.col_varchar_key	19	#
 2	DERIVED	SUBQUERY1_t1	ALL	col_int_key,col_int_key_2	NULL	NULL	NULL	19	#
 SELECT
 table1.pk AS field1 ,
@@ -1102,7 +1102,7 @@ id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 EXPLAIN SELECT * FROM t1 AS t2 STRAIGHT_JOIN t1 FORCE INDEX(b) WHERE t1.b=t2.b;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t2	ALL	b	NULL	NULL	NULL	2	Using where
-1	SIMPLE	t1	ref	b	b	5	test.t2.b	2	
+1	SIMPLE	t1	hash_ALL	b	#hash#b	5	test.t2.b	2	Using join buffer (flat, BNLH join)
 EXPLAIN SELECT b FROM t1 FORCE INDEX(b);
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	index	NULL	b	5	NULL	2	Using index
@@ -1315,8 +1315,8 @@ AND t1.i1 <= t3.i2_key;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using join buffer (flat, BNL join)
-1	PRIMARY	t3	eq_ref	PRIMARY,v_idx	PRIMARY	4	test.t4.i1	1	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (flat, BNL join)
+1	PRIMARY	t3	hash_ALL	PRIMARY,v_idx	#hash#PRIMARY	4	test.t4.i1	9	Using where; Using join buffer (incremental, BNLH join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (incremental, BNL join)
 2	MATERIALIZED	t4	ALL	NULL	NULL	NULL	NULL	3	Using where
 SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
 FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2
@@ -1371,8 +1371,8 @@ AND t1.i1 <= t3.i2_key;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using join buffer (flat, BNL join)
-1	PRIMARY	t3	eq_ref	PRIMARY,v_idx,v_idx2	PRIMARY	4	test.t4.i1	1	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (flat, BNL join)
+1	PRIMARY	t3	hash_ALL	PRIMARY,v_idx,v_idx2	#hash#PRIMARY	4	test.t4.i1	9	Using where; Using join buffer (incremental, BNLH join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (incremental, BNL join)
 2	MATERIALIZED	t4	ALL	NULL	NULL	NULL	NULL	3	Using where
 SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
 FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2
@@ -1429,8 +1429,8 @@ AND t1.i1 <= t3.i2_key;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using join buffer (flat, BNL join)
-1	PRIMARY	t3	eq_ref	PRIMARY,v_idx2	PRIMARY	4	test.t4.i1	1	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (flat, BNL join)
+1	PRIMARY	t3	hash_ALL	PRIMARY,v_idx2	#hash#PRIMARY	4	test.t4.i1	9	Using where; Using join buffer (incremental, BNLH join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (incremental, BNL join)
 2	MATERIALIZED	t4	ALL	NULL	NULL	NULL	NULL	3	Using where
 SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
 FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2
@@ -1496,8 +1496,8 @@ AND t1.i1 <= t3.i2_key;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	<subquery2>	ALL	distinct_key	NULL	NULL	NULL	3	
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using join buffer (flat, BNL join)
-1	PRIMARY	t3	eq_ref	PRIMARY,v_idx	PRIMARY	4	test.t4.i1	1	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (flat, BNL join)
+1	PRIMARY	t3	hash_ALL	PRIMARY,v_idx	#hash#PRIMARY	4	test.t4.i1	29	Using where; Using join buffer (incremental, BNLH join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using join buffer (incremental, BNL join)
 2	MATERIALIZED	t4	ALL	NULL	NULL	NULL	NULL	3	Using where
 SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1, t3.i1
 FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2
@@ -1552,8 +1552,8 @@ AND t1.i1 <= t3.i2_key;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	PRIMARY	t4	ALL	NULL	NULL	NULL	NULL	3	Using where; Start temporary
 1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	4	Using join buffer (flat, BNL join)
-1	PRIMARY	t3	eq_ref	PRIMARY,v_idx	PRIMARY	4	test.t4.i1	1	Using where
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using where; End temporary; Using join buffer (flat, BNL join)
+1	PRIMARY	t3	hash_ALL	PRIMARY,v_idx	#hash#PRIMARY	4	test.t4.i1	29	Using where; Using join buffer (incremental, BNLH join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	5	Using where; End temporary; Using join buffer (incremental, BNL join)
 SELECT /*+ NO_SEMIJOIN(@subq1) */ t1.c1, t2.i1
 FROM t1 STRAIGHT_JOIN t3 STRAIGHT_JOIN t2
 WHERE ( t3.pk IN

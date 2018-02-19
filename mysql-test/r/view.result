@@ -2313,11 +2313,11 @@ CREATE VIEW v2 AS SELECT t3.* FROM t1,t3 WHERE t1.a=t3.a;
 EXPLAIN SELECT t1.* FROM t1 JOIN t2 WHERE t1.a=t2.a AND t1.b=t2.b AND t1.a=1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ref	a	a	5	const	1	Using where; Using index
-1	SIMPLE	t2	ref	a	a	10	const,test.t1.b	1	Using index
+1	SIMPLE	t2	hash_index	a	#hash#a:a	10:10	const,test.t1.b	3	Using where; Using index; Using join buffer (flat, BNLH join)
 EXPLAIN SELECT * FROM v1 WHERE a=1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ref	a	a	5	const	1	Using where; Using index
-1	SIMPLE	t2	ref	a	a	10	const,test.t1.b	1	Using index
+1	SIMPLE	t2	hash_index	a	#hash#a:a	10:10	const,test.t1.b	3	Using where; Using index; Using join buffer (flat, BNLH join)
 EXPLAIN SELECT * FROM v2 WHERE a=1;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	t1	ref	a	a	5	const	1	Using index
@@ -3517,8 +3517,8 @@ INSERT INTO t3 VALUES
 EXPLAIN SELECT t.person_id AS a, t.person_id AS b FROM v1 t WHERE t.person_id=6;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	Extra
 1	SIMPLE	profile	const	PRIMARY	PRIMARY	4	const	1	Using temporary; Using filesort
-1	SIMPLE	userrole	ref	idx_person_id,idx_role_id	idx_person_id	4	const	2	
-1	SIMPLE	role	eq_ref	PRIMARY	PRIMARY	4	test.userrole.role_id	1	
+1	SIMPLE	userrole	ref	idx_person_id,idx_role_id	idx_person_id	4	const	2	Using index condition
+1	SIMPLE	role	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.userrole.role_id	9	Using join buffer (flat, BNLH join)
 SELECT t.person_id AS a, t.person_id AS b FROM v1 t WHERE t.person_id=6;
 a	b
 6	6
@@ -4198,7 +4198,7 @@ EXPLAIN EXTENDED
 SELECT t1.a,t2.c  FROM t1,t2 WHERE t2.pk = t1.a AND t2.pk > 8;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	100.00	Using where
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	100.00	
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t1.a	12	8.33	Using join buffer (flat, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t2`.`c` AS `c` from `test`.`t1` join `test`.`t2` where `test`.`t2`.`pk` = `test`.`t1`.`a` and `test`.`t1`.`a` > 8
 FLUSH STATUS;
@@ -4209,20 +4209,20 @@ a	c
 SHOW STATUS LIKE 'Handler_read_%';
 Variable_name	Value
 Handler_read_first	0
-Handler_read_key	1
+Handler_read_key	0
 Handler_read_last	0
 Handler_read_next	0
 Handler_read_prev	0
 Handler_read_retry	0
 Handler_read_rnd	0
 Handler_read_rnd_deleted	0
-Handler_read_rnd_next	17
+Handler_read_rnd_next	30
 CREATE VIEW v AS SELECT * FROM t2;
 EXPLAIN EXTENDED
 SELECT t1.a,v.c  FROM t1,v WHERE v.pk = t1.a AND v.pk > 8;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
 1	SIMPLE	t1	ALL	NULL	NULL	NULL	NULL	16	100.00	Using where
-1	SIMPLE	t2	eq_ref	PRIMARY	PRIMARY	4	test.t1.a	1	100.00	
+1	SIMPLE	t2	hash_ALL	PRIMARY	#hash#PRIMARY	4	test.t1.a	12	8.33	Using join buffer (flat, BNLH join)
 Warnings:
 Note	1003	select `test`.`t1`.`a` AS `a`,`test`.`t2`.`c` AS `c` from `test`.`t1` join `test`.`t2` where `test`.`t2`.`pk` = `test`.`t1`.`a` and `test`.`t1`.`a` > 8
 FLUSH STATUS;
@@ -4233,14 +4233,14 @@ a	c
 SHOW STATUS LIKE 'Handler_read_%';
 Variable_name	Value
 Handler_read_first	0
-Handler_read_key	1
+Handler_read_key	0
 Handler_read_last	0
 Handler_read_next	0
 Handler_read_prev	0
 Handler_read_retry	0
 Handler_read_rnd	0
 Handler_read_rnd_deleted	0
-Handler_read_rnd_next	17
+Handler_read_rnd_next	30
 DROP VIEW v;
 DROP TABLE t1, t2;
 #
@@ -5663,8 +5663,8 @@ a	c
 explain extended
 select * from t2, v1 where t2.a=v1.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	test.t2.a	6	100.00	Using where; Using join buffer (flat, BNLH join)
 3	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
 Warnings:
 Note	1276	Field or reference 'test.t1.a' of SELECT #3 was resolved in SELECT #2
@@ -5682,8 +5682,8 @@ a	b	a	c
 explain extended
 select * from t1, v1 where t1.a=v1.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where; Using join buffer (flat, BNL join)
+1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	test.t1.a	6	100.00	Using where; Using join buffer (flat, BNLH join)
 3	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
 Warnings:
 Note	1276	Field or reference 'test.t1.a' of SELECT #3 was resolved in SELECT #2
@@ -5718,9 +5718,9 @@ a	b	a	c
 explain extended
 select * from t2, t1, v1 where t1.a=t2.a and t1.a=v1.a;
 id	select_type	table	type	possible_keys	key	key_len	ref	rows	filtered	Extra
-1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where; Using join buffer (flat, BNL join)
-1	PRIMARY	t1	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where; Using join buffer (incremental, BNL join)
+1	PRIMARY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	test.t2.a	6	100.00	Using where; Using join buffer (flat, BNLH join)
+1	PRIMARY	t1	hash_ALL	NULL	#hash#$hj	5	test.t2.a	6	100.00	Using where; Using join buffer (incremental, BNLH join)
 3	DEPENDENT SUBQUERY	t2	ALL	NULL	NULL	NULL	NULL	6	100.00	Using where
 Warnings:
 Note	1276	Field or reference 'test.t1.a' of SELECT #3 was resolved in SELECT #2
