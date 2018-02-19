@@ -7453,17 +7453,17 @@ bool st_select_lex::check_parameters(SELECT_LEX *main_select)
   DBUG_PRINT("enter", ("select #%d %p nest level: %d",
                        select_number, this, nest_level));
 
-  if ((options & HIGH_PRIORITY) && this != main_select)
+  if ((options & SELECT_HIGH_PRIORITY) && this != main_select)
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "HIGH_PRIORITY");
     DBUG_RETURN(TRUE);
   }
-  if ((options & SQL_BUFFER_RESULT) && this != main_select)
+  if ((options & OPTION_BUFFER_RESULT) && this != main_select)
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_BUFFER_RESULT");
     DBUG_RETURN(TRUE);
   }
-  if ((options & SQL_CALC_FOUND_ROWS) && this != main_select)
+  if ((options & OPTION_FOUND_ROWS) && this != main_select)
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "SQL_CALC_FOUND_ROWS");
     DBUG_RETURN(TRUE);

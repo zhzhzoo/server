@@ -3862,6 +3862,7 @@ public:
     unit.register_select_chain(u->first_select());
     unit.first_select()->options|= builtin_select.options;
     unit.fake_select_lex= u->fake_select_lex;
+    unit.union_distinct= u->union_distinct;
 
     builtin_select.exclude_from_global();
   }

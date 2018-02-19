@@ -8606,7 +8606,7 @@ select_new:
           {
 
             Lex->set_main_unit($1);
-            if ($1->set_nest_level(1))
+            if (Lex->check_semantics_main_unit())
               MYSQL_YYABORT;
 
 
@@ -8686,7 +8686,7 @@ query_primary_parens:
             $$= $2->first_select();
           }
         | '(' query_primary
-          { 
+          {
             Lex->push_select($2);
           }
           opt_order_limit_lock_clauses ')'
@@ -8704,12 +8704,12 @@ query_primary_parens:
                   YYABORT;
                 if (unit->add_fake_select_lex(thd))
                   YYABORT;
-                $4->set_to(unit->fake_select_lex);                
+                $4->set_to(unit->fake_select_lex);
                 $$= Lex->wrap_unit_into_derived(unit);
                 if (!$$)
                   YYABORT;
               }
-            }              
+            }
           }
         ;
 
