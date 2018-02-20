@@ -353,6 +353,7 @@ enum enum_parsing_place
   IN_ON,
   IN_GROUP_BY,
   IN_ORDER_BY,
+  BEFORE_CREATE_FIELD_LIST,
   PARSING_PLACE_SIZE /* always should be the last */
 };
 

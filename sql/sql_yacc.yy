@@ -1196,6 +1196,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %token  LEAVES
 %token  LEAVE_SYM
 %token  LEFT                          /* SQL-2003-R */
+%token  LEFT_PAREN_ALT                /* INTERNAL */
 %token  LESS_SYM
 %token  LEVEL_SYM
 %token  LEX_HOSTNAME
@@ -1622,8 +1623,11 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
 %right  NOT_SYM NOT2_SYM
 %right  BINARY COLLATE_SYM
 %left  INTERVAL_SYM
-%right UNION_SYM
+/*
+%left  INTERSECT_SYM
+%left  UNION_SYM EXCEPT_SYM
 %left  ','
+*/
 
 %type <lex_str>
         IDENT IDENT_QUOTED DECIMAL_NUM FLOAT_NUM NUM LONG_NUM
@@ -2489,15 +2493,20 @@ connection_name:
 /* create a table */
 
 create:
-          create_or_replace opt_temporary TABLE_SYM opt_if_not_exists table_ident
-          {
+          create_or_replace opt_temporary TABLE_SYM opt_if_not_exists
+          { 
             LEX *lex= thd->lex;
+            lex->current_select->parsing_place= BEFORE_CREATE_FIELD_LIST;
             lex->create_info.init();
-            if (Lex->main_select_push())
+            if (lex->main_select_push())
               MYSQL_YYABORT;
             if (lex->set_command_with_check(SQLCOM_CREATE_TABLE, $2, $1 | $4))
                MYSQL_YYABORT;
-            if (!lex->builtin_select.add_table_to_list(thd, $5, NULL,
+          }
+          table_ident
+          {
+            LEX *lex= thd->lex;
+            if (!lex->builtin_select.add_table_to_list(thd, $6, NULL,
                                                        TL_OPTION_UPDATING,
                                                        TL_WRITE, MDL_EXCLUSIVE))
               MYSQL_YYABORT;
@@ -2523,7 +2532,7 @@ create:
                                   ER_WARN_USING_OTHER_HANDLER,
                                   ER_THD(thd, ER_WARN_USING_OTHER_HANDLER),
                                   hton_name(lex->create_info.db_type)->str,
-                                  $5->table.str);
+                                  $6->table.str);
             }
             create_table_set_open_action_and_adjust_tables(lex);
             Lex->pop_select(); //main select
@@ -4899,22 +4908,10 @@ size_number:
 */
 
 create_body:
-          '(' create_field_list ')'
+          create_field_list_parens
           { Lex->create_info.option_list= NULL; }
           opt_create_table_options opt_create_partitioning opt_create_select {}
         | opt_create_table_options opt_create_partitioning opt_create_select {}
-        /*
-          the following rule is redundant, but there's a shift/reduce
-          conflict that prevents the rule above from parsing a syntax like
-          CREATE TABLE t1 (SELECT 1);
-        */
-        /*
-        | '(' create_select_query_specification ')'
-        | '(' create_select_query_specification ')'
-          { Select->set_braces(1);} union_list {}
-        | '(' create_select_query_specification ')'
-          { Select->set_braces(1);} union_order_or_limit {}
-        */
         | create_like
           {
 
@@ -4934,8 +4931,11 @@ create_like:
         ;
 
 opt_create_select:
-          /* empty */ {}
+          /* empty */ { }
         | opt_duplicate opt_as create_select_query_expression
+/*
+        | opt_duplicate opt_as create_select_query_expression
+*/
         ;
 
 create_select_query_expression:
@@ -6057,6 +6057,18 @@ udf_type:
 
 create_field_list:
         field_list
+        {
+          Lex->create_last_non_select_table= Lex->last_table();
+        }
+        ;
+
+opt_create_list_parens:
+          /* empty */ 
+        | create_field_list_parens
+        ; 
+
+create_field_list_parens:
+        LEFT_PAREN_ALT field_list ')'
         {
           Lex->create_last_non_select_table= Lex->last_table();
         }
@@ -11444,8 +11456,6 @@ table_primary_derived:
             LEX *lex=Lex;
             lex->derived_tables|= DERIVED_SUBQUERY;
             $1->linkage= DERIVED_TABLE_TYPE;
-
-
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);

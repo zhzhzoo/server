@@ -1358,6 +1358,19 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
       return WITH;
     }
     break;
+  case int('('):
+    if (!thd->lex->current_select || 
+        thd->lex->current_select->parsing_place != BEFORE_CREATE_FIELD_LIST)
+      return token;
+    token= lex_one_token(yylval, thd);
+    lip->add_digest_token(token, yylval);
+    lip->lookahead_yylval= lip->yylval;
+    lip->yylval= NULL;
+    lip->lookahead_token= token;
+    thd->lex->current_select->parsing_place= NO_MATTER;
+    if (token != int('(') && token != SELECT_SYM)
+      return LEFT_PAREN_ALT;
+    break;
   default:
     break;
   }
