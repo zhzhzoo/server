@@ -1315,6 +1315,7 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
 {
   Lex_input_stream *lip= & thd->m_parser_state->m_lip;
   int token;
+  const int left_paren= (int) '(';
 
   if (lip->lookahead_token >= 0)
   {
@@ -1358,7 +1359,7 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
       return WITH;
     }
     break;
-  case int('('):
+  case left_paren:
     if (!thd->lex->current_select || 
         thd->lex->current_select->parsing_place != BEFORE_CREATE_FIELD_LIST)
       return token;
@@ -1368,8 +1369,10 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
     lip->yylval= NULL;
     lip->lookahead_token= token;
     thd->lex->current_select->parsing_place= NO_MATTER;
-    if (token != int('(') && token != SELECT_SYM)
+    if (token != left_paren && token != SELECT_SYM)
       return LEFT_PAREN_ALT;
+    else
+      return left_paren;
     break;
   default:
     break;
