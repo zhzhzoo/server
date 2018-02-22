@@ -8726,7 +8726,7 @@ query_primary_parens:
 
 query_expression_unit:
           query_primary  
-          unit_type_decl %prec UNION_SYM
+          unit_type_decl
           query_primary
           {
             SELECT_LEX *sel1;
