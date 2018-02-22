@@ -12310,6 +12310,7 @@ opt_into:
         ;
 into:
           INTO into_destination
+          { Select->options|= OPTION_INTO_CLAUSE; }
         ;
 
 into_destination:

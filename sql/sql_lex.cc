@@ -7469,6 +7469,14 @@ bool st_select_lex::check_parameters(SELECT_LEX *main_select)
   DBUG_PRINT("enter", ("select #%d %p nest level: %d",
                        select_number, this, nest_level));
 
+
+  if ((options & OPTION_INTO_CLAUSE) && (next_select() != NULL ||
+                                         nest_level != 1))
+  {
+    my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "INTO");
+    DBUG_RETURN(TRUE);
+  }
+
   if ((options & SELECT_HIGH_PRIORITY) && this != main_select)
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "HIGH_PRIORITY");
