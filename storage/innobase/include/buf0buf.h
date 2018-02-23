@@ -84,9 +84,6 @@ struct fil_addr_t;
 #define MAX_PAGE_HASH_LOCKS	1024	/*!< The maximum number of
 					page_hash locks */
 
-extern	buf_pool_t*	buf_pool;	/*!< The buffer pools
-					of the database */
-
 extern	volatile bool	buf_pool_withdrawing; /*!< true when withdrawing buffer
 					pool pages might cause page relocation */
 
@@ -105,12 +102,12 @@ extern my_bool	buf_disable_resize_buffer_pool_debug; /*!< if TRUE, resizing
 The enumeration values must be 0..7. */
 enum buf_page_state {
 	BUF_BLOCK_POOL_WATCH,		/*!< a sentinel for the buffer pool
-					watch, element of buf_pool->watch[] */
+					watch, element of buf_pool.watch[] */
 	BUF_BLOCK_ZIP_PAGE,		/*!< contains a clean
 					compressed page */
 	BUF_BLOCK_ZIP_DIRTY,		/*!< contains a compressed
 					page that is in the
-					buf_pool->flush_list */
+					buf_pool.flush_list */
 
 	BUF_BLOCK_NOT_USED,		/*!< is in the free list;
 					must be after the BUF_BLOCK_ZIP_
@@ -132,13 +129,13 @@ struct buf_pool_info_t
 {
 	/* General buffer pool info */
 	ulint	pool_size;		/*!< Buffer Pool size in pages */
-	ulint	lru_len;		/*!< Length of buf_pool->LRU */
-	ulint	old_lru_len;		/*!< buf_pool->LRU_old_len */
-	ulint	free_list_len;		/*!< Length of buf_pool->free list */
-	ulint	flush_list_len;		/*!< Length of buf_pool->flush_list */
-	ulint	n_pend_unzip;		/*!< buf_pool->n_pend_unzip, pages
+	ulint	lru_len;		/*!< Length of buf_pool.LRU */
+	ulint	old_lru_len;		/*!< buf_pool.LRU_old_len */
+	ulint	free_list_len;		/*!< Length of buf_pool.free list */
+	ulint	flush_list_len;		/*!< Length of buf_pool.flush_list */
+	ulint	n_pend_unzip;		/*!< buf_pool.n_pend_unzip, pages
 					pending decompress */
-	ulint	n_pend_reads;		/*!< buf_pool->n_pend_reads, pages
+	ulint	n_pend_reads;		/*!< buf_pool.n_pend_reads, pages
 					pending read */
 	ulint	n_pending_flush_lru;	/*!< Pages pending flush in LRU */
 	ulint	n_pending_flush_single_page;/*!< Pages pending to be
@@ -149,15 +146,15 @@ struct buf_pool_info_t
 					LIST */
 	ulint	n_pages_made_young;	/*!< number of pages made young */
 	ulint	n_pages_not_made_young;	/*!< number of pages not made young */
-	ulint	n_pages_read;		/*!< buf_pool->n_pages_read */
-	ulint	n_pages_created;	/*!< buf_pool->n_pages_created */
-	ulint	n_pages_written;	/*!< buf_pool->n_pages_written */
-	ulint	n_page_gets;		/*!< buf_pool->n_page_gets */
-	ulint	n_ra_pages_read_rnd;	/*!< buf_pool->n_ra_pages_read_rnd,
+	ulint	n_pages_read;		/*!< buf_pool.n_pages_read */
+	ulint	n_pages_created;	/*!< buf_pool.n_pages_created */
+	ulint	n_pages_written;	/*!< buf_pool.n_pages_written */
+	ulint	n_page_gets;		/*!< buf_pool.n_page_gets */
+	ulint	n_ra_pages_read_rnd;	/*!< buf_pool.n_ra_pages_read_rnd,
 					number of pages readahead */
-	ulint	n_ra_pages_read;	/*!< buf_pool->n_ra_pages_read, number
+	ulint	n_ra_pages_read;	/*!< buf_pool.n_ra_pages_read, number
 					of pages readahead */
-	ulint	n_ra_pages_evicted;	/*!< buf_pool->n_ra_pages_evicted,
+	ulint	n_ra_pages_evicted;	/*!< buf_pool.n_ra_pages_evicted,
 					number of readahead pages evicted
 					without access */
 	ulint	n_page_get_delta;	/*!< num of buffer pool page gets since
@@ -187,7 +184,7 @@ struct buf_pool_info_t
 					without access, in pages per second */
 
 	/* Stats about LRU eviction */
-	ulint	unzip_lru_len;		/*!< length of buf_pool->unzip_LRU
+	ulint	unzip_lru_len;		/*!< length of buf_pool.unzip_LRU
 					list */
 	/* Counters for LRU policy */
 	ulint	io_sum;			/*!< buf_LRU_stat_sum.io */
@@ -322,13 +319,6 @@ operator<<(
 	const page_id_t&	page_id);
 
 #ifndef UNIV_INNOCHECKSUM
-/** Create the buffer pool.
-@return whether the creation failed */
-bool buf_pool_init();
-/** Free the buffer pool at shutdown.
-This must not be invoked before freeing all mutexes. */
-void buf_pool_free();
-
 /** Determines if a block is intended to be withdrawn.
 @param[in]	block		pointer to control block
 @retval true	if will be withdrawn */
@@ -625,7 +615,7 @@ buf_page_get_newest_modification(
 					page frame */
 /********************************************************************//**
 Increments the modify clock of a frame by 1. The caller must (1) own the
-buf_pool->mutex and block bufferfix count has to be zero, (2) or own an x-lock
+buf_pool.mutex and block bufferfix count has to be zero, (2) or own an x-lock
 on the block. */
 UNIV_INLINE
 void
@@ -1003,9 +993,9 @@ buf_block_set_io_fix(
 /*=================*/
 	buf_block_t*	block,	/*!< in/out: control block */
 	enum buf_io_fix	io_fix);/*!< in: io_fix state */
-/*********************************************************************//**
-Makes a block sticky. A sticky block implies that even after we release
-the buf_pool->mutex and the block->mutex:
+
+/** Make a block sticky. A sticky block implies that even after we release
+the buf_pool.mutex and the block->mutex:
 * it cannot be removed from the flush_list
 * the block descriptor cannot be relocated
 * it cannot be removed from the LRU list
@@ -1332,9 +1322,9 @@ public:
 	/** @name General fields
 	None of these bit-fields must be modified without holding
 	buf_page_get_mutex() [buf_block_t::mutex or
-	buf_pool->zip_mutex], since they can be stored in the same
+	buf_pool.zip_mutex], since they can be stored in the same
 	machine word.  Some of these fields are additionally protected
-	by buf_pool->mutex. */
+	by buf_pool.mutex. */
 	/* @{ */
 
 	/** Page id. Protected by buf_pool mutex. */
@@ -1347,7 +1337,7 @@ public:
 	ib_uint32_t	buf_fix_count;
 
 	/** type of pending I/O operation; also protected by
-	buf_pool->mutex for writes only */
+	buf_pool.mutex for writes only */
 	buf_io_fix	io_fix;
 
 	/** Block state. @see buf_page_in_file */
@@ -1360,10 +1350,10 @@ public:
 	/* @} */
 	page_zip_des_t	zip;		/*!< compressed page; zip.data
 					(but not the data it points to) is
-					also protected by buf_pool->mutex;
+					also protected by buf_pool.mutex;
 					state == BUF_BLOCK_ZIP_PAGE and
 					zip.data == NULL means an active
-					buf_pool->watch */
+					buf_pool.watch */
 
 	ulint           write_size;	/* Write size is set when this
 					page is first time written and then
@@ -1382,22 +1372,22 @@ public:
 					used for encryption/compression
 					or NULL */
 	buf_page_t*	hash;		/*!< node used in chaining to
-					buf_pool->page_hash or
-					buf_pool->zip_hash */
+					buf_pool.page_hash or
+					buf_pool.zip_hash */
 #ifdef UNIV_DEBUG
-	ibool		in_page_hash;	/*!< TRUE if in buf_pool->page_hash */
-	ibool		in_zip_hash;	/*!< TRUE if in buf_pool->zip_hash */
+	ibool		in_page_hash;	/*!< TRUE if in buf_pool.page_hash */
+	ibool		in_zip_hash;	/*!< TRUE if in buf_pool.zip_hash */
 #endif /* UNIV_DEBUG */
 
 	/** @name Page flushing fields
-	All these are protected by buf_pool->mutex. */
+	All these are protected by buf_pool.mutex. */
 	/* @{ */
 
 	UT_LIST_NODE_T(buf_page_t) list;
 					/*!< based on state, this is a
 					list node, protected either by
-					buf_pool->mutex or by
-					buf_pool->flush_list_mutex,
+					buf_pool.mutex or by
+					buf_pool.flush_list_mutex,
 					in one of the following lists in
 					buf_pool:
 
@@ -1408,9 +1398,9 @@ public:
 
 					If bpage is part of flush_list
 					then the node pointers are
-					covered by buf_pool->flush_list_mutex.
+					covered by buf_pool.flush_list_mutex.
 					Otherwise these pointers are
-					protected by buf_pool->mutex.
+					protected by buf_pool.mutex.
 
 					The contents of the list node
 					is undefined if !in_flush_list
@@ -1421,19 +1411,19 @@ public:
 					BUF_BLOCK_READY_IN_USE. */
 
 #ifdef UNIV_DEBUG
-	ibool		in_flush_list;	/*!< TRUE if in buf_pool->flush_list;
-					when buf_pool->flush_list_mutex is
+	ibool		in_flush_list;	/*!< TRUE if in buf_pool.flush_list;
+					when buf_pool.flush_list_mutex is
 					free, the following should hold:
 					in_flush_list
 					== (state == BUF_BLOCK_FILE_PAGE
 					    || state == BUF_BLOCK_ZIP_DIRTY)
 					Writes to this field must be
 					covered by both block->mutex
-					and buf_pool->flush_list_mutex. Hence
+					and buf_pool.flush_list_mutex. Hence
 					reads can happen while holding
 					any one of the two mutexes */
-	ibool		in_free_list;	/*!< TRUE if in buf_pool->free; when
-					buf_pool->mutex is free, the following
+	ibool		in_free_list;	/*!< TRUE if in buf_pool.free; when
+					buf_pool.mutex is free, the following
 					should hold: in_free_list
 					== (state == BUF_BLOCK_NOT_USED) */
 #endif /* UNIV_DEBUG */
@@ -1456,13 +1446,13 @@ public:
 					modifications are on disk.
 					Writes to this field must be
 					covered by both block->mutex
-					and buf_pool->flush_list_mutex. Hence
+					and buf_pool.flush_list_mutex. Hence
 					reads can happen while holding
 					any one of the two mutexes */
 	/* @} */
 	/** @name LRU replacement algorithm fields
-	These fields are protected by buf_pool->mutex only (not
-	buf_pool->zip_mutex or buf_block_t::mutex). */
+	These fields are protected by buf_pool.mutex only (not
+	buf_pool.zip_mutex or buf_block_t::mutex). */
 	/* @{ */
 
 	UT_LIST_NODE_T(buf_page_t) LRU;
@@ -1473,9 +1463,9 @@ public:
 					debugging */
 #endif /* UNIV_DEBUG */
 	unsigned	old:1;		/*!< TRUE if the block is in the old
-					blocks in buf_pool->LRU_old */
+					blocks in buf_pool.LRU_old */
 	unsigned	freed_page_clock:31;/*!< the value of
-					buf_pool->freed_page_clock
+					buf_pool.freed_page_clock
 					when this block was the last
 					time put to the head of the
 					LRU list; a thread is allowed
@@ -1491,7 +1481,7 @@ public:
 	ibool		file_page_was_freed;
 					/*!< this is set to TRUE when
 					fsp frees a page in buffer pool;
-					protected by buf_pool->zip_mutex
+					protected by buf_pool.zip_mutex
 					or buf_block_t::mutex. */
 # endif /* UNIV_DEBUG */
 };
@@ -1505,7 +1495,7 @@ struct buf_block_t{
 
 	buf_page_t	page;		/*!< page information; this must
 					be the first field, so that
-					buf_pool->page_hash can point
+					buf_pool.page_hash can point
 					to buf_page_t or buf_block_t */
 	byte*		frame;		/*!< pointer to buffer frame which
 					is of size UNIV_PAGE_SIZE, and
@@ -1527,7 +1517,7 @@ struct buf_block_t{
 	uint32_t	lock_hash_val;	/*!< hashed value of the page address
 					in the record lock hash table;
 					protected by buf_block_t::lock
-					(or buf_block_t::mutex, buf_pool->mutex
+					(or buf_block_t::mutex, buf_pool.mutex
 				        in buf_page_get_gen(),
 					buf_page_init_for_read()
 					and buf_page_create()) */
@@ -1668,7 +1658,7 @@ struct buf_block_t{
 
 
 /**********************************************************************//**
-Compute the hash fold value for blocks in buf_pool->zip_hash. */
+Compute the hash fold value for blocks in buf_pool.zip_hash. */
 /* @{ */
 #define BUF_POOL_ZIP_FOLD_PTR(ptr) ((ulint) (ptr) / UNIV_PAGE_SIZE)
 #define BUF_POOL_ZIP_FOLD(b) BUF_POOL_ZIP_FOLD_PTR((b)->frame)
@@ -1734,7 +1724,7 @@ protected:
 	buf_page_t*		m_hp;
 };
 
-/** Class implementing buf_pool->flush_list hazard pointer */
+/** Class implementing buf_pool.flush_list hazard pointer */
 class FlushHp: public HazardPointer {
 
 public:
@@ -1752,7 +1742,7 @@ public:
 	void adjust(const buf_page_t* bpage);
 };
 
-/** Class implementing buf_pool->LRU hazard pointer */
+/** Class implementing buf_pool.LRU hazard pointer */
 class LRUHp: public HazardPointer {
 
 public:
@@ -1861,8 +1851,28 @@ typedef struct {
 } buf_tmp_array_t;
 
 /** The buffer pool */
-struct buf_pool_t
+class buf_pool_t
 {
+  bool m_initialised;
+public:
+  /** Constructor */
+  buf_pool_t() :
+    m_initialised(false),
+    allocator(ut_allocator<byte>(mem_key_buf_buf_pool)),
+    flush_hp(&flush_list_mutex),
+    lru_hp(&mutex),
+    lru_scan_itr(&mutex),
+    single_scan_itr(&mutex)
+  {}
+  /** Create the buffer pool.
+  @return whether the creation failed */
+  bool create();
+  /** Free the buffer pool at shutdown.
+  This must not be invoked before freeing all mutexes. */
+  void close();
+  /** @return whether the buffer pool is initialised */
+  bool is_initialised() const { return m_initialised; }
+
 	/** @name General fields */
 	/* @{ */
 	BufPoolMutex	mutex;		/*!< Buffer pool mutex of this
@@ -1901,9 +1911,9 @@ struct buf_pool_t
 					page_hash is protected by an
 					array of mutexes.
 					Changes in page_hash are protected
-					by buf_pool->mutex and the relevant
+					by buf_pool.mutex and the relevant
 					page_hash mutex. Lookups can happen
-					while holding the buf_pool->mutex or
+					while holding the buf_pool.mutex or
 					the relevant page_hash mutex. */
 	hash_table_t*	page_hash_old;	/*!< old pointer to page_hash to be
 					freed after resizing buffer pool */
@@ -1989,7 +1999,7 @@ struct buf_pool_t
 					eviction. Set to TRUE whenever
 					we flush a batch from the
 					buffer pool. Protected by the
-					buf_pool->mutex */
+					buf_pool.mutex */
 	/* @} */
 
 	/** @name LRU replacement algorithm fields */
@@ -2058,7 +2068,7 @@ struct buf_pool_t
 	buf_page_t*			watch;
 					/*!< Sentinel records for buffer
 					pool watches. Protected by
-					buf_pool->mutex. */
+					buf_pool.mutex. */
 
 	buf_tmp_array_t*		tmp_arr;
 					/*!< Array for temporal memory
@@ -2069,6 +2079,9 @@ struct buf_pool_t
 #endif
 	/* @} */
 };
+
+/** The InnoDB buffer pool */
+extern buf_pool_t buf_pool;
 
 /** @name Accessors for buffer pool mutexes
 Use these instead of accessing buffer pool mutexes directly. */
@@ -2093,15 +2106,15 @@ UNIV_INLINE
 rw_lock_t*
 buf_page_hash_lock_get(const page_id_t& page_id)
 {
-	return hash_get_lock(buf_pool->page_hash, page_id.fold());
+	return hash_get_lock(buf_pool.page_hash, page_id.fold());
 }
 
 /** If not appropriate page_hash_lock, relock until appropriate. */
 # define buf_page_hash_lock_s_confirm(hash_lock, page_id)\
-	hash_lock_s_confirm(hash_lock, buf_pool->page_hash, (page_id).fold())
+	hash_lock_s_confirm(hash_lock, buf_pool.page_hash, (page_id).fold())
 
 # define buf_page_hash_lock_x_confirm(hash_lock, page_id)\
-	hash_lock_x_confirm(hash_lock, buf_pool->page_hash, (page_id).fold())
+	hash_lock_x_confirm(hash_lock, buf_pool.page_hash, (page_id).fold())
 
 #ifdef UNIV_DEBUG
 /** Test if page_hash lock is held in s-mode. */
@@ -2137,13 +2150,13 @@ buf_page_hash_lock_get(const page_id_t& page_id)
 #if defined UNIV_DEBUG || defined UNIV_BUF_DEBUG
 /** Forbid the release of the buffer pool mutex. */
 # define buf_pool_mutex_exit_forbid() do {	\
-	ut_ad(mutex_own(&buf_pool->mutex));	\
-	buf_pool->mutex_exit_forbidden++;	\
+	ut_ad(mutex_own(&buf_pool.mutex));	\
+	buf_pool.mutex_exit_forbidden++;	\
 } while (0)
 /** Allow the release of the buffer pool mutex. */
 # define buf_pool_mutex_exit_allow() do {		\
-	ut_ad(mutex_own(&buf_pool->mutex));		\
-	ut_ad(buf_pool->mutex_exit_forbidden--);	\
+	ut_ad(mutex_own(&buf_pool.mutex));		\
+	ut_ad(buf_pool.mutex_exit_forbidden--);	\
 } while (0)
 #else
 /** Forbid the release of the buffer pool mutex. */
@@ -2206,7 +2219,7 @@ inline buf_page_t* LRUItr::start()
 	ut_ad(mutex_own(m_mutex));
 
 	if (!m_hp || m_hp->old) {
-		m_hp = UT_LIST_GET_LAST(buf_pool->LRU);
+		m_hp = UT_LIST_GET_LAST(buf_pool.LRU);
 	}
 
 	return(m_hp);
@@ -2223,7 +2236,7 @@ struct	CheckInLRUList {
 	static void validate()
 	{
 		CheckInLRUList	check;
-		ut_list_validate(buf_pool->LRU, check);
+		ut_list_validate(buf_pool.LRU, check);
 	}
 };
 
@@ -2237,7 +2250,7 @@ struct	CheckInFreeList {
 	static void validate()
 	{
 		CheckInFreeList	check;
-		ut_list_validate(buf_pool->free, check);
+		ut_list_validate(buf_pool.free, check);
 	}
 };
 
@@ -2251,7 +2264,7 @@ struct	CheckUnzipLRUAndLRUList {
 	static void validate()
 	{
 		CheckUnzipLRUAndLRUList	check;
-		ut_list_validate(buf_pool->unzip_LRU, check);
+		ut_list_validate(buf_pool.unzip_LRU, check);
 	}
 };
 #endif /* UNIV_DEBUG || defined UNIV_BUF_DEBUG */
