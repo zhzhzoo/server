@@ -883,7 +883,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
   Currently there are 98 shift/reduce conflicts.
   We should not introduce new conflicts any more.
 */
-%expect 99
+%expect 97
 
 /*
    Comments for TOKENS.
@@ -2496,7 +2496,7 @@ create:
           create_or_replace opt_temporary TABLE_SYM opt_if_not_exists
           { 
             LEX *lex= thd->lex;
-            lex->current_select->parsing_place= BEFORE_CREATE_FIELD_LIST;
+            lex->current_select->parsing_place= BEFORE_OPT_FIELD_LIST;
             lex->create_info.init();
             if (lex->main_select_push())
               MYSQL_YYABORT;
@@ -11459,9 +11459,13 @@ table_primary_derived:
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);
-            SELECT_LEX_UNIT *unit= Lex->create_unit($1);
+            SELECT_LEX_UNIT *unit= $1->master_unit();
             if (!unit)
-              YYABORT;
+            {
+              unit= Lex->create_unit($1);
+              if (!unit)
+                YYABORT;
+            }
             curr_sel->register_unit(unit, &curr_sel->context);
             curr_sel->add_statistics(unit);
 
@@ -12582,6 +12586,7 @@ insert:
             if (Lex->main_select_push())
               MYSQL_YYABORT;
             mysql_init_select(lex);
+            lex->current_select->parsing_place= BEFORE_OPT_FIELD_LIST;
           }
           insert_lock_option
           opt_ignore insert2
@@ -12604,6 +12609,7 @@ replace:
             if (Lex->main_select_push())
               MYSQL_YYABORT;
             mysql_init_select(lex);
+            lex->current_select->parsing_place= BEFORE_OPT_FIELD_LIST;
           }
           replace_lock_option insert2
           {
@@ -12666,8 +12672,7 @@ insert_table:
 
 insert_field_spec:
           insert_values {}
-        | '(' ')' insert_values {}
-        | '(' fields ')' insert_values {}
+        | insert_field_list insert_values {}
         | SET
           {
             LEX *lex=Lex;
@@ -12678,15 +12683,30 @@ insert_field_spec:
           ident_eq_list
         ;
 
+insert_field_list:
+          LEFT_PAREN_ALT opt_fields ')'
+        ;
+
+opt_fields:
+          /* empty */
+        | fields
+        ;
+
 fields:
           fields ',' insert_ident
           { Lex->field_list.push_back($3, thd->mem_root); }
         | insert_ident { Lex->field_list.push_back($1, thd->mem_root); }
         ;
 
+
+
 insert_values:
-          VALUES values_list {}
-        | VALUE_SYM values_list {}
+          VALUES
+          { Lex->current_select->parsing_place= NO_MATTER; }
+          values_list {}
+        | VALUE_SYM
+          { Lex->current_select->parsing_place= NO_MATTER; }
+          values_list {}
         | create_select_query_expression {}
         ;
 

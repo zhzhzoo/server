@@ -1361,7 +1361,7 @@ int MYSQLlex(YYSTYPE *yylval, THD *thd)
     break;
   case left_paren:
     if (!thd->lex->current_select || 
-        thd->lex->current_select->parsing_place != BEFORE_CREATE_FIELD_LIST)
+        thd->lex->current_select->parsing_place != BEFORE_OPT_FIELD_LIST)
       return token;
     token= lex_one_token(yylval, thd);
     lip->add_digest_token(token, yylval);
