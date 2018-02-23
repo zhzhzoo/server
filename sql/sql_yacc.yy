@@ -614,6 +614,7 @@ void sp_create_assignment_lex(THD *thd, bool no_lookahead)
         lex->sphead->m_tmp_query= lip->get_tok_end();
     /* Inherit from outer lex. */
     lex->option_type= old_lex->option_type;
+    lex->main_select_push();
   }
 }
 
@@ -673,6 +674,7 @@ bool sp_create_assignment_instr(THD *thd, bool no_lookahead)
       if (sp->add_instr(i))
         return true;
     }
+    lex->pop_select();
     enum_var_type inner_option_type= lex->option_type;
     if (lex->sphead->restore_lex(thd))
       return true;
@@ -3988,10 +3990,15 @@ sp_proc_stmt_statement:
 
 sp_proc_stmt_return:
           RETURN_SYM 
-          { Lex->sphead->reset_lex(thd); }
+          {
+            Lex->sphead->reset_lex(thd);
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
+          }
           expr
           {
             LEX *lex= Lex;
+            lex->pop_select(); //main select
             sp_head *sp= lex->sphead;
             if (sp->m_handler->add_instr_freturn(thd, sp, lex->spcont,
                                                  $3, lex) ||
