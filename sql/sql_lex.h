@@ -1318,7 +1318,7 @@ public:
     DBUG_ASSERT(l == UNION_TYPE ||
                 l == INTERSECT_TYPE ||
                 l == EXCEPT_TYPE);
-    if (d && master_unit() && !master_unit()->union_distinct)
+    if (d && master_unit() && master_unit()->union_distinct != this)
       master_unit()->union_distinct= this;
     distinct= d;
     DBUG_VOID_RETURN;

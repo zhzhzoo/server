@@ -8795,9 +8795,9 @@ query_expression_unit:
               last->set_master_unit($$);
             }
             last->link_neighbour(sel1);
+            sel1->set_master_unit($1);
             sel1->set_linkage_and_distinct($2.unit_type, $2.distinct);
             $$= $1;
-            sel1->set_master_unit($$);
             $$->pre_last_parse= last;
           }
         ;
