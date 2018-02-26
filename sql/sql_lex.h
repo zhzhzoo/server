@@ -2867,6 +2867,7 @@ public:
     syntax error back.
   */
   bool expr_allows_subselect;
+  bool selects_allow_into;
   /*
     A special command "PARSE_VCOL_EXPR" is defined for the parser 
     to translate a defining expression of a virtual column into an 
@@ -3866,7 +3867,7 @@ public:
 
     builtin_select.exclude_from_global();
   }
-  bool check_semantics_main_unit();
+  bool check_main_unit_semantics();
 };
 
 

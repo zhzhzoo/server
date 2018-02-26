@@ -4951,7 +4951,7 @@ create_select_query_expression:
             SELECT_LEX *first_select= $1->first_select();
 
             Lex->insert_select_hack(first_select);
-            if (Lex->check_semantics_main_unit())
+            if (Lex->check_main_unit_semantics())
               MYSQL_YYABORT;
 
             if (Lex->sql_command == SQLCOM_INSERT ||
@@ -8622,9 +8622,9 @@ opt_ignore_leaves:
 select_new:
           query_expression
           {
-
+            Lex->selects_allow_into= TRUE;
             Lex->set_main_unit($1);
-            if (Lex->check_semantics_main_unit())
+            if (Lex->check_main_unit_semantics())
               MYSQL_YYABORT;
 
 
@@ -16527,7 +16527,7 @@ view_select:
           {
             SQL_I_List<TABLE_LIST> *save= &Lex->first_select_lex()->table_list;
             Lex->set_main_unit($2);
-            if (Lex->check_semantics_main_unit())
+            if (Lex->check_main_unit_semantics())
               MYSQL_YYABORT;
             Lex->first_select_lex()->table_list.push_front(save);
             Lex->current_select= Lex->first_select_lex();

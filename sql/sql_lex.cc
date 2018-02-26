@@ -744,6 +744,7 @@ void LEX::start(THD *thd_arg)
   query_tables= 0;
   reset_query_tables_list(FALSE);
   expr_allows_subselect= TRUE;
+  selects_allow_into= FALSE;
   use_only_table_context= FALSE;
   parse_vcol_expr= FALSE;
   check_exists= FALSE;
@@ -7470,8 +7471,10 @@ bool st_select_lex::check_parameters(SELECT_LEX *main_select)
                        select_number, this, nest_level));
 
 
-  if ((options & OPTION_INTO_CLAUSE) && (next_select() != NULL ||
-                                         nest_level != 1))
+  if ((options & OPTION_INTO_CLAUSE) &&
+       (!parent_lex->selects_allow_into ||
+        next_select() != NULL ||
+        nest_level != 1))
   {
     my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "INTO");
     DBUG_RETURN(TRUE);
@@ -7553,7 +7556,7 @@ bool st_select_lex_unit::check_parameters(SELECT_LEX *main_select)
 }
 
 
-bool LEX::check_semantics_main_unit()
+bool LEX::check_main_unit_semantics()
 {
   if (unit.set_nest_level(1) ||
       unit.check_parameters(first_select_lex()))

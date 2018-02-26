@@ -406,16 +406,6 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   bool res= FALSE;
   DBUG_ENTER("mysql_create_view");
 
-  {
-    SELECT_LEX *sel= lex->first_select_lex();
-    for(; sel->next_select(); sel= sel->next_select());
-    if (sel->options & OPTION_INTO_CLAUSE)
-    {
-      my_error(ER_CANT_USE_OPTION_HERE, MYF(0), "INTO");
-      DBUG_RETURN(TRUE);
-    }
-  }
-
   /* This is ensured in the parser. */
   DBUG_ASSERT(!lex->proc_list.first && !lex->result &&
               !lex->param_list.elements);
