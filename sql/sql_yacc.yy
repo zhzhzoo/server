@@ -8656,7 +8656,13 @@ query_specification:
             sel->braces= FALSE;
           }
           select_options
+          {
+            Select->parsing_place= SELECT_LIST;
+          }
           select_item_list
+          {
+            Select->parsing_place= NO_MATTER;
+          }
           opt_into
           opt_from_clause
           opt_where_clause
