@@ -7906,9 +7906,9 @@ bool LEX::insert_select_hack(SELECT_LEX *sel)
   sel->table_list.elements++;
   insert_table->select_lex= sel;
 
+  sel->context.first_name_resolution_table= insert_table;
+  builtin_select.context= sel->context;
   change_item_list_context(&field_list, &sel->context);
-  change_item_list_context(&update_list, &sel->context);
-  change_item_list_context(&value_list, &sel->context);
 
   DBUG_RETURN(FALSE);
 }

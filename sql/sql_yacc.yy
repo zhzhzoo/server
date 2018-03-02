@@ -12137,7 +12137,16 @@ order_limit_lock_clauses:
             else
               $$= NULL;
           }
-          ;
+        | select_lock_type
+          {
+            $$= new(thd->mem_root) Lex_order_limit_lock;
+            if (!$$)
+              YYABORT;
+            $$->order_list= NULL;
+            $$->limit.empty();
+            $$->lock= $1;
+          }
+        ;
 
 opt_plus:
           /* empty */

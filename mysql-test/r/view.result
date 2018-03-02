@@ -919,9 +919,9 @@ select * from v4;
 ERROR 21000: Subquery returns more than 1 row
 drop view v4, v3, v2, v1;
 create view v1 as select 5 into @w;
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into @w' at line 1
+ERROR 42000: Incorrect usage/placement of 'INTO'
 create view v1 as select 5 into outfile 'ttt';
-ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'into outfile 'ttt'' at line 1
+ERROR 42000: Incorrect usage/placement of 'INTO'
 create table t1 (a int);
 create view v1 as select a from t1 procedure analyse();
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'procedure analyse()' at line 1
@@ -4163,7 +4163,7 @@ LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
 ;
 SELECT 1
-FROM ((  SELECT 1
+FROM (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4171,8 +4171,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t1)
-LEFT OUTER JOIN ((  SELECT 1
+) t1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4180,8 +4180,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t2) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t2 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4189,8 +4189,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t3) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t3 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4198,8 +4198,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t4) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t4 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4207,8 +4207,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t5) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t5 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4216,8 +4216,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t6) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t6 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4225,8 +4225,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t7) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t7 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4234,18 +4234,18 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t8) ON 1=1
+) t8 ON 1=1
 ;
 1
 SELECT 1
-FROM (v1 t1)
-LEFT OUTER JOIN (v1 t2) ON 1=1
-LEFT OUTER JOIN (v1 t3) ON 1=1
-LEFT OUTER JOIN (v1 t4) ON 1=1
-LEFT OUTER JOIN (v1 t5) ON 1=1
-LEFT OUTER JOIN (v1 t6) ON 1=1
-LEFT OUTER JOIN (v1 t7) ON 1=1
-LEFT OUTER JOIN (v1 t8) ON 1=1
+FROM v1 t1
+LEFT OUTER JOIN v1 t2 ON 1=1
+LEFT OUTER JOIN v1 t3 ON 1=1
+LEFT OUTER JOIN v1 t4 ON 1=1
+LEFT OUTER JOIN v1 t5 ON 1=1
+LEFT OUTER JOIN v1 t6 ON 1=1
+LEFT OUTER JOIN v1 t7 ON 1=1
+LEFT OUTER JOIN v1 t8 ON 1=1
 ;
 1
 drop view v1;
@@ -4870,25 +4870,25 @@ CREATE VIEW v5 AS (SELECT 'buggy' AS col1, 'fix' as col2 FROM DUAL) UNION ALL
 # without this fix.
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS (select '' AS `Name_exp_1`)	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select '' AS `Name_exp_1`	latin1	latin1_swedish_ci
 # Name for the column in select2 is set with this fix.
 # Without this fix, name would not have set for the
 # columns in select2.
 SHOW CREATE VIEW v2;
 View	Create View	character_set_client	collation_connection
-v2	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS (select 'BUG#14117018' AS `col1`) union all (select '' AS `Name_exp_1`)	latin1	latin1_swedish_ci
+v2	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v2` AS select 'BUG#14117018' AS `col1` union all select '' AS `Name_exp_1`	latin1	latin1_swedish_ci
 # Name for the field item in select2 & select3 is set with this fix.
 # Without this fix, name would not have set for the
 # columns in select2 & select3.
 SHOW CREATE VIEW v3;
 View	Create View	character_set_client	collation_connection
-v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS (select 'BUG#14117018' AS `col1`) union all (select '' AS `Name_exp_1`) union all (select '' AS `Name_exp_1`)	latin1	latin1_swedish_ci
+v3	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v3` AS select 'BUG#14117018' AS `col1` union all select '' AS `Name_exp_1` union all select '' AS `Name_exp_1`	latin1	latin1_swedish_ci
 # Name for the field item in select3 is set with this fix.
 # Without this fix, name would not have set for the
 # columns in select3.
 SHOW CREATE VIEW v4;
 View	Create View	character_set_client	collation_connection
-v4	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v4` AS (select 'BUG#14117018' AS `col1`) union all (select '' AS `col2`) union all (select '' AS `Name_exp_1`)	latin1	latin1_swedish_ci
+v4	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v4` AS select 'BUG#14117018' AS `col1` union all select '' AS `col2` union all select '' AS `Name_exp_1`	latin1	latin1_swedish_ci
 DROP VIEW v1, v2, v3, v4, v5;
 #
 # BUG#19886430: VIEW CREATION WITH NAMED COLUMNS, OVER UNION,
@@ -5318,7 +5318,7 @@ LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
 ;
 SELECT 1
-FROM ((  SELECT 1
+FROM (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5326,8 +5326,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t1)
-LEFT OUTER JOIN ((  SELECT 1
+) t1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5335,8 +5335,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t2) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t2 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5344,8 +5344,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t3) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t3 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5353,8 +5353,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t4) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t4 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5362,8 +5362,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t5) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t5 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5371,8 +5371,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t6) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t6 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5380,8 +5380,8 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t7) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t7 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
 FROM t1 a_alias_1
 LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5389,18 +5389,18 @@ LEFT JOIN t4 d_alias_1 ON d_alias_1.d1 = a_alias_1.a1
 LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
 LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
 LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t8) ON 1=1
+) t8 ON 1=1
 ;
 1
 SELECT 1
-FROM (v1 t1)
-LEFT OUTER JOIN (v1 t2) ON 1=1
-LEFT OUTER JOIN (v1 t3) ON 1=1
-LEFT OUTER JOIN (v1 t4) ON 1=1
-LEFT OUTER JOIN (v1 t5) ON 1=1
-LEFT OUTER JOIN (v1 t6) ON 1=1
-LEFT OUTER JOIN (v1 t7) ON 1=1
-LEFT OUTER JOIN (v1 t8) ON 1=1
+FROM v1 t1
+LEFT OUTER JOIN v1 t2 ON 1=1
+LEFT OUTER JOIN v1 t3 ON 1=1
+LEFT OUTER JOIN v1 t4 ON 1=1
+LEFT OUTER JOIN v1 t5 ON 1=1
+LEFT OUTER JOIN v1 t6 ON 1=1
+LEFT OUTER JOIN v1 t7 ON 1=1
+LEFT OUTER JOIN v1 t8 ON 1=1
 ;
 1
 drop view v1;
@@ -5963,7 +5963,7 @@ insert into t1 values (1),(2);
 CREATE VIEW v1 AS SELECT * FROM t1 FOR UPDATE;
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1` for update	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1` lock in share mode	latin1	latin1_swedish_ci
 select * from v1;
 a
 1
@@ -6215,7 +6215,7 @@ DROP VIEW v1;
 CREATE VIEW v1 AS SELECT 1 AS a UNION (SELECT a FROM t1);
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union (select `t1`.`a` AS `a` from `t1`)	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union select `t1`.`a` AS `a` from `t1`	latin1	latin1_swedish_ci
 SELECT * FROM v1;
 a
 1
@@ -6226,16 +6226,15 @@ DROP VIEW v1;
 CREATE VIEW v1 AS SELECT 1 AS a UNION (SELECT a FROM t1 LIMIT 1);
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union (select `t1`.`a` AS `a` from `t1` limit 1)	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union select `t1`.`a` AS `a` from `t1` limit 1	latin1	latin1_swedish_ci
 SELECT * FROM v1;
 a
 1
-10
 DROP VIEW v1;
 CREATE VIEW v1 AS SELECT 1 AS a UNION (SELECT a FROM t1) LIMIT 1;
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union (select `t1`.`a` AS `a` from `t1`) limit 1	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select 1 AS `a` union select `t1`.`a` AS `a` from `t1` limit 1	latin1	latin1_swedish_ci
 SELECT * FROM v1;
 a
 1
@@ -6516,7 +6515,7 @@ insert into t1 values (1),(2);
 CREATE VIEW v1 AS SELECT * FROM t1 FOR UPDATE;
 SHOW CREATE VIEW v1;
 View	Create View	character_set_client	collation_connection
-v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1` for update	latin1	latin1_swedish_ci
+v1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1` lock in share mode	latin1	latin1_swedish_ci
 select * from v1;
 a
 1
@@ -6587,56 +6586,11 @@ DROP VIEW v;
 # MDEV-13439: Database permissions are not enough to run a subquery
 # with GROUP BY within a view
 #
-create database test_db;
-use test_db;
-create table t (i int);
-create user foo@localhost;
-grant all on test_db.* to foo@localhost;
-connect  con1,localhost,foo,,;
-use test_db;
-create view v as select * from (select i from t group by i) sq;
-select * from v;
-i
-disconnect con1;
-connection default;
-use test;
-drop database test_db;
-drop user foo@localhost;
 #
 # MDEV-13523: Group By in a View, called within a Stored Routine
 # causes Error Code 1356 when a non-root user runs the routine for
 # a second time
 #
-CREATE DATABASE bugTest;
-USE bugTest;
-CREATE TABLE `procViewTable` (`id` int(10), `someText` varchar(50) NOT NULL);
-insert  into `procViewTable` values (1,'Test'), (2,'Test 2');
-CREATE USER 'procView'@'%';
-GRANT ALL PRIVILEGES ON `bugTest`.* TO 'procView'@'%';
-CREATE DEFINER=`procView`@`%` VIEW `procViewSimple` AS (
-select * from (
-select `id` from `bugTest`.`procViewTable`
-  ) `innerQuery`
-  group by `innerQuery`.`id`
-);
-connect  con1,localhost,procView,,;
-use bugTest;
-prepare stmt from "SELECT * FROM procViewSimple";
-execute stmt;
-id
-1
-2
-execute stmt;
-id
-1
-2
-disconnect con1;
-connection default;
-drop user procView;
-drop view procViewSimple;
-drop table procViewTable;
-use test;
-drop database bugTest;
 #
 # MDEV-13436: PREPARE doesn't work as expected & throws errors but
 # MySQL is working fine

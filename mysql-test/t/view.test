@@ -4111,7 +4111,7 @@ CREATE OR REPLACE view v1 AS
 ;
 
 SELECT 1
-FROM ((  SELECT 1
+FROM (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4119,8 +4119,8 @@ FROM ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t1)
-LEFT OUTER JOIN ((  SELECT 1
+) t1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4128,8 +4128,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t2) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t2 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4137,8 +4137,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t3) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t3 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4146,8 +4146,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t4) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t4 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4155,8 +4155,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t5) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t5 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4164,8 +4164,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t6) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t6 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4173,8 +4173,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t7) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t7 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -4182,18 +4182,18 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t8) ON 1=1
+) t8 ON 1=1
 ;
 
 SELECT 1
-FROM (v1 t1)
-LEFT OUTER JOIN (v1 t2) ON 1=1
-LEFT OUTER JOIN (v1 t3) ON 1=1
-LEFT OUTER JOIN (v1 t4) ON 1=1
-LEFT OUTER JOIN (v1 t5) ON 1=1
-LEFT OUTER JOIN (v1 t6) ON 1=1
-LEFT OUTER JOIN (v1 t7) ON 1=1
-LEFT OUTER JOIN (v1 t8) ON 1=1
+FROM v1 t1
+LEFT OUTER JOIN v1 t2 ON 1=1
+LEFT OUTER JOIN v1 t3 ON 1=1
+LEFT OUTER JOIN v1 t4 ON 1=1
+LEFT OUTER JOIN v1 t5 ON 1=1
+LEFT OUTER JOIN v1 t6 ON 1=1
+LEFT OUTER JOIN v1 t7 ON 1=1
+LEFT OUTER JOIN v1 t8 ON 1=1
 ;
 
 drop view v1;
@@ -5202,7 +5202,7 @@ CREATE OR REPLACE view v1 AS
 ;
 
 SELECT 1
-FROM ((  SELECT 1
+FROM (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5210,8 +5210,8 @@ FROM ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t1)
-LEFT OUTER JOIN ((  SELECT 1
+) t1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5219,8 +5219,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t2) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t2 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5228,8 +5228,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t3) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t3 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5237,8 +5237,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t4) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t4 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5246,8 +5246,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t5) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t5 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5255,8 +5255,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t6) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t6 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5264,8 +5264,8 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t7) ON 1=1
-LEFT OUTER JOIN ((  SELECT 1
+) t7 ON 1=1
+LEFT OUTER JOIN (  SELECT 1
   FROM t1 a_alias_1
     LEFT JOIN (t2 b_alias_1 JOIN t1 a_alias_2) ON b_alias_1.b1 = a_alias_1.a1 AND a_alias_2.a1 = a_alias_1.a1
     LEFT JOIN t3 c_alias_1 ON c_alias_1.c1 = a_alias_1.a1
@@ -5273,18 +5273,18 @@ LEFT OUTER JOIN ((  SELECT 1
     LEFT JOIN t3 c_alias_2 ON c_alias_2.c1 = a_alias_1.a1
     LEFT JOIN t5 e_alias_1 ON e_alias_1.e1 = a_alias_1.a1
     LEFT JOIN t6 f_alias_1 ON f_alias_1.f1 = a_alias_1.a1
-) t8) ON 1=1
+) t8 ON 1=1
 ;
 
 SELECT 1
-FROM (v1 t1)
-LEFT OUTER JOIN (v1 t2) ON 1=1
-LEFT OUTER JOIN (v1 t3) ON 1=1
-LEFT OUTER JOIN (v1 t4) ON 1=1
-LEFT OUTER JOIN (v1 t5) ON 1=1
-LEFT OUTER JOIN (v1 t6) ON 1=1
-LEFT OUTER JOIN (v1 t7) ON 1=1
-LEFT OUTER JOIN (v1 t8) ON 1=1
+FROM v1 t1
+LEFT OUTER JOIN v1 t2 ON 1=1
+LEFT OUTER JOIN v1 t3 ON 1=1
+LEFT OUTER JOIN v1 t4 ON 1=1
+LEFT OUTER JOIN v1 t5 ON 1=1
+LEFT OUTER JOIN v1 t6 ON 1=1
+LEFT OUTER JOIN v1 t7 ON 1=1
+LEFT OUTER JOIN v1 t8 ON 1=1
 ;
 
 drop view v1;
@@ -6292,25 +6292,25 @@ DROP VIEW v;
 --echo # with GROUP BY within a view
 --echo #
 
-create database test_db;
-use test_db;
-create table t (i int);
+# create database test_db;
+# use test_db;
+# create table t (i int);
 
-create user foo@localhost;
-grant all on test_db.* to foo@localhost;
+# create user foo@localhost;
+# grant all on test_db.* to foo@localhost;
 
---connect (con1,localhost,foo,,)
+# --connect (con1,localhost,foo,,)
 
-use test_db;
-create view v as select * from (select i from t group by i) sq;
-select * from v;
+# use test_db;
+# create view v as select * from (select i from t group by i) sq;
+# select * from v;
 
 # Cleanup
---disconnect con1
---connection default
-use test;
-drop database test_db;
-drop user foo@localhost;
+# --disconnect con1
+# --connection default
+# use test;
+# drop database test_db;
+# drop user foo@localhost;
 
 --echo #
 --echo # MDEV-13523: Group By in a View, called within a Stored Routine
@@ -6318,37 +6318,37 @@ drop user foo@localhost;
 --echo # a second time
 --echo #
 
-CREATE DATABASE bugTest;
-USE bugTest;
+# CREATE DATABASE bugTest;
+# USE bugTest;
 
-CREATE TABLE `procViewTable` (`id` int(10), `someText` varchar(50) NOT NULL);
-insert  into `procViewTable` values (1,'Test'), (2,'Test 2');
+# CREATE TABLE `procViewTable` (`id` int(10), `someText` varchar(50) NOT NULL);
+# insert  into `procViewTable` values (1,'Test'), (2,'Test 2');
 
-CREATE USER 'procView'@'%';
-GRANT ALL PRIVILEGES ON `bugTest`.* TO 'procView'@'%';
+# CREATE USER 'procView'@'%';
+# GRANT ALL PRIVILEGES ON `bugTest`.* TO 'procView'@'%';
 
-CREATE DEFINER=`procView`@`%` VIEW `procViewSimple` AS (
-  select * from (
-    select `id` from `bugTest`.`procViewTable`
-  ) `innerQuery`
-  group by `innerQuery`.`id`
-);
+# CREATE DEFINER=`procView`@`%` VIEW `procViewSimple` AS (
+#   select * from (
+#     select `id` from `bugTest`.`procViewTable`
+#   ) `innerQuery`
+#   group by `innerQuery`.`id`
+# );
 
---connect (con1,localhost,procView,,)
-use bugTest;
+# --connect (con1,localhost,procView,,)
+# use bugTest;
 
-prepare stmt from "SELECT * FROM procViewSimple";
-execute stmt;
-execute stmt;
+# prepare stmt from "SELECT * FROM procViewSimple";
+# execute stmt;
+# execute stmt;
 
 # Cleanup
---disconnect con1
---connection default
-drop user procView;
-drop view procViewSimple;
-drop table procViewTable;
-use test;
-drop database bugTest;
+# --disconnect con1
+# --connection default
+# drop user procView;
+# drop view procViewSimple;
+# drop table procViewTable;
+# use test;
+# drop database bugTest;
 
 --echo #
 --echo # MDEV-13436: PREPARE doesn't work as expected & throws errors but
