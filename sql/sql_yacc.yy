@@ -12934,6 +12934,8 @@ single_multi:
           delete_limit_clause {}
           opt_select_expressions
           {
+            if ($6)
+              Select->order_list= *($6);
             Lex->pop_select(); //main select
           }
         | table_wild_list
