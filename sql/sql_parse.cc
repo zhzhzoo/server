@@ -7547,11 +7547,7 @@ mysql_init_select(LEX *lex)
   SELECT_LEX *select_lex= lex->current_select;
   select_lex->init_select();
   lex->wild= 0;
-  if (select_lex == lex->first_select_lex())
-  {
-    DBUG_ASSERT(lex->result == 0);
-    lex->exchange= 0;
-  }
+  lex->exchange= 0;
 }
 
 

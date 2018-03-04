@@ -6292,25 +6292,25 @@ DROP VIEW v;
 --echo # with GROUP BY within a view
 --echo #
 
-# create database test_db;
-# use test_db;
-# create table t (i int);
+create database test_db;
+use test_db;
+create table t (i int);
 
-# create user foo@localhost;
-# grant all on test_db.* to foo@localhost;
+create user foo@localhost;
+grant all on test_db.* to foo@localhost;
 
-# --connect (con1,localhost,foo,,)
+--connect (con1,localhost,foo,,)
 
-# use test_db;
-# create view v as select * from (select i from t group by i) sq;
-# select * from v;
+use test_db;
+create view v as select * from (select i from t group by i) sq;
+select * from v;
 
 # Cleanup
-# --disconnect con1
-# --connection default
-# use test;
-# drop database test_db;
-# drop user foo@localhost;
+--disconnect con1
+--connection default
+use test;
+drop database test_db;
+drop user foo@localhost;
 
 --echo #
 --echo # MDEV-13523: Group By in a View, called within a Stored Routine
@@ -6318,37 +6318,37 @@ DROP VIEW v;
 --echo # a second time
 --echo #
 
-# CREATE DATABASE bugTest;
-# USE bugTest;
+CREATE DATABASE bugTest;
+USE bugTest;
 
-# CREATE TABLE `procViewTable` (`id` int(10), `someText` varchar(50) NOT NULL);
-# insert  into `procViewTable` values (1,'Test'), (2,'Test 2');
+CREATE TABLE `procViewTable` (`id` int(10), `someText` varchar(50) NOT NULL);
+insert  into `procViewTable` values (1,'Test'), (2,'Test 2');
 
-# CREATE USER 'procView'@'%';
-# GRANT ALL PRIVILEGES ON `bugTest`.* TO 'procView'@'%';
+CREATE USER 'procView'@'%';
+GRANT ALL PRIVILEGES ON `bugTest`.* TO 'procView'@'%';
 
-# CREATE DEFINER=`procView`@`%` VIEW `procViewSimple` AS (
-#   select * from (
-#     select `id` from `bugTest`.`procViewTable`
-#   ) `innerQuery`
-#   group by `innerQuery`.`id`
-# );
+CREATE DEFINER=`procView`@`%` VIEW `procViewSimple` AS (
+  select * from (
+    select `id` from `bugTest`.`procViewTable`
+  ) `innerQuery`
+  group by `innerQuery`.`id`
+);
 
-# --connect (con1,localhost,procView,,)
-# use bugTest;
+--connect (con1,localhost,procView,,)
+use bugTest;
 
-# prepare stmt from "SELECT * FROM procViewSimple";
-# execute stmt;
-# execute stmt;
+prepare stmt from "SELECT * FROM procViewSimple";
+execute stmt;
+execute stmt;
 
 # Cleanup
-# --disconnect con1
-# --connection default
-# drop user procView;
-# drop view procViewSimple;
-# drop table procViewTable;
-# use test;
-# drop database bugTest;
+--disconnect con1
+--connection default
+drop user procView;
+drop view procViewSimple;
+drop table procViewTable;
+use test;
+drop database bugTest;
 
 --echo #
 --echo # MDEV-13436: PREPARE doesn't work as expected & throws errors but
