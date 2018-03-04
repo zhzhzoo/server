@@ -245,15 +245,16 @@ If no binlog information is present, the first byte is NUL. */
 #ifdef WITH_WSREP
 /** The offset to WSREP XID headers */
 #define	TRX_RSEG_WSREP_XID_INFO		TRX_RSEG_MAX_TRX_ID + 16 + 512
-
+/** Sequence number of WSREP XID. It is used to find latest WSREP XID info. */
+#define	TRX_RSEG_WSREP_XID_SEQNO	TRX_RSEG_WSREP_XID_INFO
 /** WSREP XID format (1 if present and valid, 0 if not present) */
-#define TRX_RSEG_WSREP_XID_FORMAT	TRX_RSEG_WSREP_XID_INFO
+#define TRX_RSEG_WSREP_XID_FORMAT	TRX_RSEG_WSREP_XID_INFO + 8
 /** WSREP XID GTRID length */
-#define TRX_RSEG_WSREP_XID_GTRID_LEN	TRX_RSEG_WSREP_XID_INFO + 4
+#define TRX_RSEG_WSREP_XID_GTRID_LEN	TRX_RSEG_WSREP_XID_INFO + 12
 /** WSREP XID bqual length */
-#define TRX_RSEG_WSREP_XID_BQUAL_LEN	TRX_RSEG_WSREP_XID_INFO + 8
+#define TRX_RSEG_WSREP_XID_BQUAL_LEN	TRX_RSEG_WSREP_XID_INFO + 16
 /** WSREP XID data (XIDDATASIZE bytes) */
-#define TRX_RSEG_WSREP_XID_DATA		TRX_RSEG_WSREP_XID_INFO + 12
+#define TRX_RSEG_WSREP_XID_DATA		TRX_RSEG_WSREP_XID_INFO + 20
 #endif /* WITH_WSREP*/
 
 /*-------------------------------------------------------------*/

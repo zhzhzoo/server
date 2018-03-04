@@ -83,6 +83,9 @@ trx_rseg_update_wsrep_checkpoint(
 	trx_sys_cur_xid_seqno = xid_seqno;
 #endif /* UNIV_DEBUG */
 
+	mlog_write_ull(TRX_RSEG_WSREP_XID_SEQNO + rseg_header,
+		       trx_sys.get_max_trx_id(), mtr);
+
 	mlog_write_ulint(TRX_RSEG_WSREP_XID_FORMAT + rseg_header,
 			 uint32_t(xid->formatID),
 			 MLOG_4BYTES, mtr);
@@ -209,7 +212,7 @@ bool trx_rseg_read_wsrep_checkpoint(XID& xid)
 		}
 
 		trx_id_t id = mach_read_from_8(rseg_header
-					       + TRX_RSEG_MAX_TRX_ID);
+					       + TRX_RSEG_WSREP_XID_SEQNO);
 
 		if (id < max_id) {
 			continue;
@@ -398,44 +401,60 @@ trx_undo_lists_init(trx_rseg_t* rseg, trx_id_t& max_trx_id,
 }
 
 /** Restore the state of a persistent rollback segment.
-@param[in,out]	rseg		persistent rollback segment
-@param[in,out]	max_trx_id	maximum observed transaction identifier
-@param[in,out]	max_rseg_trx_id	maximum observed TRX_RSEG_MAX_TRX_ID
+@param[in,out]	rseg			persistent rollback segment
+@param[in,out]	max_trx_id		maximum observed transaction identifier
+@param[in,out]	max_rseg_xid_seqno	maximum observed sequence number for
+					WSREP XID info
 @param[in,out]	mtr		mini-transaction */
 static
 void
 trx_rseg_mem_restore(
 	trx_rseg_t*	rseg,
 	trx_id_t&	max_trx_id,
-	trx_id_t&	max_rseg_trx_id,
+#ifdef	WITH_WSREP
+	trx_id_t&	max_rseg_xid_seqno,
+#endif
 	mtr_t*		mtr)
 {
 	trx_rsegf_t*	rseg_header = trx_rsegf_get_new(
 		rseg->space, rseg->page_no, mtr);
+	lint		binlog_offset;
 
 	if (mach_read_from_4(rseg_header + TRX_RSEG_FORMAT) == 0) {
 		trx_id_t id = mach_read_from_8(rseg_header
 					       + TRX_RSEG_MAX_TRX_ID);
-
+#ifdef 	WITH_WSREP
+		trx_id_t xid_seqno = mach_read_from_8(rseg_header
+						   + TRX_RSEG_WSREP_XID_SEQNO);
+#endif /* WITH_WSRSEP */
 		if (id > max_trx_id) {
 			max_trx_id = id;
 		}
 
-		if (id > max_rseg_trx_id) {
-			max_rseg_trx_id = id;
+		if (rseg_header[TRX_RSEG_BINLOG_NAME]) {
 
-			if (rseg_header[TRX_RSEG_BINLOG_NAME]) {
+			binlog_offset = mach_read_from_8(
+				rseg_header + TRX_RSEG_BINLOG_OFFSET);
+
+			if (strncmp((char*) rseg_header + TRX_RSEG_BINLOG_NAME,
+				    trx_sys.recovered_binlog_filename,
+				    TRX_RSEG_BINLOG_NAME_LEN) >= 0
+			    && (trx_sys.recovered_binlog_offset
+				< binlog_offset)) {
+
 				memcpy(trx_sys.recovered_binlog_filename,
 				       rseg_header + TRX_RSEG_BINLOG_NAME,
 				       TRX_RSEG_BINLOG_NAME_LEN);
-				trx_sys.recovered_binlog_offset = mach_read_from_8(
-						rseg_header
-						+ TRX_RSEG_BINLOG_OFFSET);
+				trx_sys.recovered_binlog_offset =
+					binlog_offset;
 			}
 
 #ifdef WITH_WSREP
-			trx_rseg_read_wsrep_checkpoint(
-				rseg_header, trx_sys.recovered_wsrep_xid);
+			if (xid_seqno > max_rseg_xid_seqno) {
+				max_rseg_xid_seqno = xid_seqno;
+				trx_rseg_read_wsrep_checkpoint(
+					rseg_header, trx_sys.recovered_wsrep_xid);
+			}
 #endif
 		}
 	}
@@ -513,11 +532,12 @@ static void trx_rseg_init_binlog_info(const page_t* page)
 void
 trx_rseg_array_init()
 {
-	trx_id_t max_trx_id = 0, max_rseg_trx_id = 0;
+	trx_id_t max_trx_id = 0;
 
 	*trx_sys.recovered_binlog_filename = '\0';
 	trx_sys.recovered_binlog_offset = -1;
 #ifdef WITH_WSREP
+	trx_id_t max_rseg_xid_seqno = 0;
 	memset(&trx_sys.recovered_wsrep_xid, 0,
 	       sizeof trx_sys.recovered_wsrep_xid);
 	trx_sys.recovered_wsrep_xid.formatID = -1;
@@ -549,7 +569,10 @@ trx_rseg_array_init()
 				ut_ad(!trx_sys.rseg_array[rseg_id]);
 				trx_sys.rseg_array[rseg_id] = rseg;
 				trx_rseg_mem_restore(
-					rseg, max_trx_id, max_rseg_trx_id,
+					rseg, max_trx_id,
+#ifdef WITH_WSREP
+					max_rseg_xid_seqno,
+#endif
 					&mtr);
 			}
 		}
