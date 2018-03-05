@@ -825,9 +825,9 @@ st_select_lex_unit *With_element::clone_parsed_spec(THD *thd,
   if (parser_state.init(thd, (char*) unparsed_spec.str, unparsed_spec.length))
     goto err;
   lex_start(thd);
-  with_select= lex->first_select_lex();
-  with_select->select_number= ++thd->select_number;
   parse_status= parse_sql(thd, &parser_state, 0);
+  with_select= lex->first_select_lex();
+  //with_select->select_number= ++thd->select_number;
   if (parse_status)
     goto err;
   spec_tables= lex->query_tables;
