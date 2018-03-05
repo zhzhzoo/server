@@ -1055,13 +1055,17 @@ bool TABLE_LIST::set_as_with_table(THD *thd, With_element *with_elem)
   }
   with= with_elem;
   if (!with_elem->is_referenced() || with_elem->is_recursive)
+  {
     derived= with_elem->spec;
+    select_lex->register_unit(derived, NULL);
+  }
   else 
   {
     if(!(derived= with_elem->clone_parsed_spec(thd, this)))
       return true;
     derived->with_element= with_elem;
   }
+  select_lex->add_statistics(derived); 
   with_elem->inc_references();
   return false;
 }

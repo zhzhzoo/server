@@ -8891,8 +8891,11 @@ subselect:
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);
-            curr_sel->register_unit($1, &curr_sel->context);
-            curr_sel->add_statistics($1);
+            if (curr_sel)
+            {
+              curr_sel->register_unit($1, &curr_sel->context);
+              curr_sel->add_statistics($1);
+            }
 
             $$= $1->first_select();
           }

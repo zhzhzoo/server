@@ -3864,7 +3864,7 @@ public:
     unit.first_select()->options|= builtin_select.options;
     unit.fake_select_lex= u->fake_select_lex;
     unit.union_distinct= u->union_distinct;
-
+    unit.set_with_clause(u->with_clause);
     builtin_select.exclude_from_global();
   }
   bool check_main_unit_semantics();
