@@ -2498,10 +2498,10 @@ create:
           create_or_replace opt_temporary TABLE_SYM opt_if_not_exists
           { 
             LEX *lex= thd->lex;
-            lex->current_select->parsing_place= BEFORE_OPT_FIELD_LIST;
             lex->create_info.init();
             if (lex->main_select_push())
               MYSQL_YYABORT;
+            lex->current_select->parsing_place= BEFORE_OPT_FIELD_LIST;
             if (lex->set_command_with_check(SQLCOM_CREATE_TABLE, $2, $1 | $4))
                MYSQL_YYABORT;
           }
