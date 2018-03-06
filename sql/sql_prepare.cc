@@ -3870,6 +3870,7 @@ bool Prepared_statement::prepare(const char *packet, uint packet_len)
   */
   status_var_increment(thd->status_var.com_stmt_prepare);
 
+  thd->select_number= 0;
   if (! (lex= new (mem_root) st_lex_local))
     DBUG_RETURN(TRUE);
 
