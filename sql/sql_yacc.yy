@@ -13800,9 +13800,13 @@ purge:
             LEX *lex=Lex;
             lex->type=0;
             lex->sql_command = SQLCOM_PURGE;
+            if (lex->main_select_push())
+              MYSQL_YYABORT;
           }
           purge_options
-          {}
+          {
+            Lex->pop_select(); //main select
+          }
         ;
 
 purge_options:
@@ -13813,8 +13817,6 @@ purge_option:
           TO_SYM TEXT_STRING_sys
           {
             Lex->to_log = $2.str;
-            if (Lex->main_select_push())
-              MYSQL_YYABORT;
           }
         | BEFORE_SYM expr
           {
@@ -13822,8 +13824,6 @@ purge_option:
             lex->value_list.empty();
             lex->value_list.push_front($2, thd->mem_root);
             lex->sql_command= SQLCOM_PURGE_BEFORE;
-
-            Lex->pop_select(); //main select
           }
         ;
 
