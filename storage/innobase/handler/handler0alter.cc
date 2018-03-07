@@ -126,6 +126,12 @@ static const Alter_inplace_info::HA_ALTER_FLAGS INNOBASE_ALTER_NOREBUILD
 	| Alter_inplace_info::DROP_VIRTUAL_COLUMN
 	| Alter_inplace_info::ALTER_VIRTUAL_COLUMN_ORDER;
 
+static const Alter_inplace_info::HA_ALTER_FLAGS INNOBASE_ALTER_INSTANT
+	= INNOBASE_INPLACE_IGNORE
+	| Alter_inplace_info::ALTER_VIRTUAL_COLUMN_ORDER
+	| Alter_inplace_info::ADD_VIRTUAL_COLUMN
+	| Alter_inplace_info::ALTER_COLUMN_NAME;
+
 struct ha_innobase_inplace_ctx : public inplace_alter_handler_ctx
 {
 	/** Dummy query graph */
@@ -679,13 +685,16 @@ instant_alter_column_possible(
 by ALTER TABLE and holding data used during in-place alter.
 
 @retval HA_ALTER_INPLACE_NOT_SUPPORTED Not supported
-@retval HA_ALTER_INPLACE_NO_LOCK Supported
-@retval HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE Supported, but requires
-lock during main phase and exclusive lock during prepare phase.
-@retval HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE Supported, prepare phase
-requires exclusive lock (any transactions that have accessed the table
-must commit or roll back first, and no transactions can access the table
-while prepare_inplace_alter_table() is executing)
+@retval HA_ALTER_INPLACE_INSTANT Supported
+@retval HA_ALTER_INPLACE_COPY_NO_LOCK, HA_ALTER_INPLACE_NOCOPY_NO_LOCK
+Supported, prepare phase exclusive lock (any transactions that have
+accessed the table must commit or roll back first, and no transactions
+can access the table while prepare_inplace_alter_table() is executing
+@retval HA_ALTER_INPLACE_COPY_LOCK, HA_ALTER_INPLACE_NOCOPY_LOCK
+Supported , but requires lock during main phase and exclusive lock during
+prepare phase.
+HA_ALTER_INPLACE_COPY_NO_LOCK, HA_ALTER_INPLACE_COPY_LOCK - requires
+the table to be rebuilt.
 */
 
 enum_alter_inplace_result
@@ -694,6 +703,7 @@ ha_innobase::check_if_supported_inplace_alter(
 	TABLE*			altered_table,
 	Alter_inplace_info*	ha_alter_info)
 {
+	enum_alter_inplace_result	result;
 	DBUG_ENTER("check_if_supported_inplace_alter");
 
 	if ((table->versioned(VERS_TIMESTAMP) || altered_table->versioned(VERS_TIMESTAMP))
@@ -761,10 +771,6 @@ ha_innobase::check_if_supported_inplace_alter(
 		DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 	}
 #endif
-
-	if (!(ha_alter_info->handler_flags & ~INNOBASE_INPLACE_IGNORE)) {
-		DBUG_RETURN(HA_ALTER_INPLACE_NO_LOCK);
-	}
 
 	/* Only support NULL -> NOT NULL change if strict table sql_mode
 	is set. Fall back to COPY for conversion if not strict tables.
@@ -898,6 +904,7 @@ ha_innobase::check_if_supported_inplace_alter(
 	/* We should be able to do the operation in-place.
 	See if we can do it online (LOCK=NONE). */
 	bool	online = true;
+	bool	copy = false;
 
 	List_iterator_fast<Create_field> cf_it(
 		ha_alter_info->alter_info->create_list);
@@ -1159,7 +1166,11 @@ next_column:
 		/* MDEV-14246 FIXME: return HA_ALTER_INPLACE_NO_LOCK and
 		perform all work in ha_innobase::commit_inplace_alter_table(),
 		to avoid an unnecessary MDL upgrade/downgrade cycle. */
-		DBUG_RETURN(HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE);
+		DBUG_RETURN(HA_ALTER_INPLACE_INSTANT);
+	}
+
+	if (!(ha_alter_info->handler_flags & ~INNOBASE_ALTER_INSTANT)) {
+		DBUG_RETURN(HA_ALTER_INPLACE_INSTANT);
 	}
 
 	if (!online) {
@@ -1243,9 +1254,21 @@ cannot_create_many_fulltext_index:
 		online = false;
 	}
 
-	DBUG_RETURN(online
-		    ? HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE
-		    : HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE);
+	if (innobase_need_rebuild(ha_alter_info, table)) {
+		copy = true;
+	}
+
+	if (copy) {
+		result = online
+			 ? HA_ALTER_INPLACE_COPY_NO_LOCK
+			 : HA_ALTER_INPLACE_COPY_LOCK;
+	} else {
+		result = online
+			 ? HA_ALTER_INPLACE_NOCOPY_NO_LOCK
+			 : HA_ALTER_INPLACE_NOCOPY_LOCK;
+	}
+
+	DBUG_RETURN(result);
 }
 
 /*************************************************************//**

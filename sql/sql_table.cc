@@ -7514,7 +7514,11 @@ static bool mysql_inplace_alter_table(THD *thd,
   */
   if (inplace_supported == HA_ALTER_INPLACE_EXCLUSIVE_LOCK ||
       ((inplace_supported == HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE ||
-        inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE) &&
+        inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE ||
+        inplace_supported == HA_ALTER_INPLACE_NOCOPY_NO_LOCK ||
+        inplace_supported == HA_ALTER_INPLACE_NOCOPY_LOCK ||
+        inplace_supported == HA_ALTER_INPLACE_COPY_LOCK ||
+        inplace_supported == HA_ALTER_INPLACE_COPY_NO_LOCK) &&
        (thd->locked_tables_mode == LTM_LOCK_TABLES ||
         thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)) ||
        alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE)
@@ -7539,7 +7543,11 @@ static bool mysql_inplace_alter_table(THD *thd,
     reopen_tables= true;
   }
   else if (inplace_supported == HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE ||
-           inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE)
+           inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE ||
+           inplace_supported == HA_ALTER_INPLACE_COPY_NO_LOCK ||
+	   inplace_supported == HA_ALTER_INPLACE_COPY_LOCK ||
+	   inplace_supported == HA_ALTER_INPLACE_NOCOPY_LOCK ||
+           inplace_supported == HA_ALTER_INPLACE_NOCOPY_NO_LOCK)
   {
     /*
       Storage engine has requested exclusive lock only for prepare phase
@@ -7584,7 +7592,10 @@ static bool mysql_inplace_alter_table(THD *thd,
     DBUG_ASSERT(0);
     // fall through
   case HA_ALTER_INPLACE_NO_LOCK:
+  case HA_ALTER_INPLACE_INSTANT:
   case HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE:
+  case HA_ALTER_INPLACE_COPY_NO_LOCK:
+  case HA_ALTER_INPLACE_NOCOPY_NO_LOCK:
     switch (alter_info->requested_lock) {
     case Alter_info::ALTER_TABLE_LOCK_DEFAULT:
     case Alter_info::ALTER_TABLE_LOCK_NONE:
@@ -7598,6 +7609,8 @@ static bool mysql_inplace_alter_table(THD *thd,
   case HA_ALTER_INPLACE_EXCLUSIVE_LOCK:
   case HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE:
   case HA_ALTER_INPLACE_SHARED_LOCK:
+  case HA_ALTER_INPLACE_COPY_LOCK:
+  case HA_ALTER_INPLACE_NOCOPY_LOCK:
     break;
   }
 
@@ -7620,11 +7633,15 @@ static bool mysql_inplace_alter_table(THD *thd,
   {
     /* If storage engine or user requested shared lock downgrade to SNW. */
     if (inplace_supported == HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE ||
+        inplace_supported == HA_ALTER_INPLACE_COPY_LOCK ||
+        inplace_supported == HA_ALTER_INPLACE_NOCOPY_LOCK ||
         alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_SHARED)
       table->mdl_ticket->downgrade_lock(MDL_SHARED_NO_WRITE);
     else
     {
-      DBUG_ASSERT(inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE);
+      DBUG_ASSERT(inplace_supported == HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE
+                  || inplace_supported == HA_ALTER_INPLACE_COPY_NO_LOCK
+                  || inplace_supported == HA_ALTER_INPLACE_NOCOPY_NO_LOCK);
       table->mdl_ticket->downgrade_lock(MDL_SHARED_UPGRADABLE);
     }
   }
@@ -9808,17 +9825,61 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db, const LEX_CSTRING *n
         thd->drop_temporary_table(altered_table, NULL, false);
         goto err_new_table_cleanup;
       }
+
       break;
     case HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE:
     case HA_ALTER_INPLACE_NO_LOCK:
+    case HA_ALTER_INPLACE_INSTANT:
+      break;
+    case HA_ALTER_INPLACE_COPY_LOCK:
+    case HA_ALTER_INPLACE_COPY_NO_LOCK:
+
+      if (alter_info->requested_algorithm >=
+          Alter_info::ALTER_TABLE_ALGORITHM_NOCOPY)
+      {
+        ha_alter_info.report_unsupported_error(
+                "ALGORITHM=INSTANT or ALGORITHM=NOCOPY",
+                "ALGORITHM=INPLACE");
+        thd->drop_temporary_table(altered_table, NULL, false);
+        goto err_new_table_cleanup;
+      }
+
+      if (inplace_supported == HA_ALTER_INPLACE_COPY_LOCK
+          && alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE)
+      {
+        ha_alter_info.report_unsupported_error("LOCK=NONE", "LOCK=SHARED");
+        thd->drop_temporary_table(altered_table, NULL, false);
+        goto err_new_table_cleanup;
+      }
+     break;
+    case HA_ALTER_INPLACE_NOCOPY_LOCK:
+    case HA_ALTER_INPLACE_NOCOPY_NO_LOCK:
+
+      if (alter_info->requested_algorithm ==
+          Alter_info::ALTER_TABLE_ALGORITHM_INSTANT)
+      {
+        ha_alter_info.report_unsupported_error("ALGORITHM=INSTANT",
+                                               "ALGORITHM=NOCOPY");
+        thd->drop_temporary_table(altered_table, NULL, false);
+        goto err_new_table_cleanup;
+      }
+
+      if (inplace_supported == HA_ALTER_INPLACE_NOCOPY_LOCK
+          && alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE)
+      {
+        ha_alter_info.report_unsupported_error("LOCK=NONE", "LOCK=SHARED");
+        thd->drop_temporary_table(altered_table, NULL, false);
+        goto err_new_table_cleanup;
+      }
       break;
     case HA_ALTER_INPLACE_NOT_SUPPORTED:
-      // If INPLACE was requested, report error.
-      if (alter_info->requested_algorithm ==
+      // If subset of INPLACE or INPLACE  was requested, report error.
+      if (alter_info->requested_algorithm >=
           Alter_info::ALTER_TABLE_ALGORITHM_INPLACE)
       {
-        ha_alter_info.report_unsupported_error("ALGORITHM=INPLACE",
-                                               "ALGORITHM=COPY");
+        ha_alter_info.report_unsupported_error(
+             "ALGORITHM=INPLACE OR ALGORITHM=NOCOPY OR ALGORITHM=INSTANT",
+             "ALGORITHM=COPY");
         thd->drop_temporary_table(altered_table, NULL, false);
         goto err_new_table_cleanup;
       }

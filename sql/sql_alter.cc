@@ -60,6 +60,10 @@ bool Alter_info::set_requested_algorithm(const LEX_CSTRING *str)
     requested_algorithm= ALTER_TABLE_ALGORITHM_COPY;
   else if (!my_strcasecmp(system_charset_info, str->str, "DEFAULT"))
     requested_algorithm= ALTER_TABLE_ALGORITHM_DEFAULT;
+  else if (!my_strcasecmp(system_charset_info, str->str, "NOCOPY"))
+    requested_algorithm= ALTER_TABLE_ALGORITHM_NOCOPY;
+  else if (!my_strcasecmp(system_charset_info, str->str, "INSTANT"))
+    requested_algorithm= ALTER_TABLE_ALGORITHM_INSTANT;
   else
     return true;
   return false;

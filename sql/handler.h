@@ -73,6 +73,11 @@ class sequence_definition;
 */
 enum enum_alter_inplace_result {
   HA_ALTER_ERROR,
+  HA_ALTER_INPLACE_COPY_NO_LOCK,
+  HA_ALTER_INPLACE_COPY_LOCK,
+  HA_ALTER_INPLACE_NOCOPY_LOCK,
+  HA_ALTER_INPLACE_NOCOPY_NO_LOCK,
+  HA_ALTER_INPLACE_INSTANT,
   HA_ALTER_INPLACE_NOT_SUPPORTED,
   HA_ALTER_INPLACE_EXCLUSIVE_LOCK,
   HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE,
@@ -2013,6 +2018,13 @@ public:
   virtual ~inplace_alter_handler_ctx() {}
 };
 
+/** Describes the subset of inplace algorithm to use when altering the
+table. */
+enum enum_alter_inplace_algorithm
+{
+ /** Subset of Inplace algorithm. It prevents rebuild operation. */
+ ALGORITHM_NOCOPY
+};
 
 /**
   Class describing changes to be done by ALTER TABLE.

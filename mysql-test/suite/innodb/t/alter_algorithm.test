@@ -1,0 +1,48 @@
+--source include/have_innodb.inc
+
+--echo # ALTER COPY ALGORITHM
+let $algorithm_type = COPY;
+let $error_code = 0;
+--source include/alter_nocopy_fail.inc
+
+let $error_code = 0;
+--source include/alter_nocopy.inc
+
+let $error_code = 0;
+--source include/alter_instant.inc
+
+--echo # ALTER INPLACE ALGORITHM
+let $algorithm_type = INPLACE;
+
+let $error_code = 0;
+--source include/alter_nocopy_fail.inc
+
+let $error_code = 0;
+--source include/alter_nocopy.inc
+
+let $error_code = 0;
+--source include/alter_instant.inc
+
+--echo # ALTER NOCOPY ALGORITHM
+
+let $algorithm_type = NOCOPY;
+let $error_code = ER_ALTER_OPERATION_NOT_SUPPORTED;
+--source include/alter_nocopy_fail.inc
+
+let $error_code = 0;
+--source include/alter_nocopy.inc
+
+let $error_code = 0;
+--source include/alter_instant.inc
+
+--echo # ALTER INSTANT ALGORITHM
+
+let $algorithm_type = INSTANT;
+let $error_code = ER_ALTER_OPERATION_NOT_SUPPORTED;
+--source include/alter_nocopy_fail.inc
+
+let $error_code = ER_ALTER_OPERATION_NOT_SUPPORTED;
+--source include/alter_nocopy.inc
+
+let $error_code = 0;
+--source include/alter_instant.inc

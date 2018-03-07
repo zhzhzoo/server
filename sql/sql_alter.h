@@ -133,11 +133,17 @@ public:
     // In-place if supported, copy otherwise.
     ALTER_TABLE_ALGORITHM_DEFAULT,
 
+    // Copy if supported, error otherwise.
+    ALTER_TABLE_ALGORITHM_COPY,
+
     // In-place if supported, error otherwise.
     ALTER_TABLE_ALGORITHM_INPLACE,
 
-    // Copy if supported, error otherwise.
-    ALTER_TABLE_ALGORITHM_COPY
+    // No Copy will refuse any operation which does rebuild.
+    ALTER_TABLE_ALGORITHM_NOCOPY,
+
+   // Instant should allow operation to be quick.
+   ALTER_TABLE_ALGORITHM_INSTANT
   };
 
 
@@ -150,7 +156,7 @@ public:
     // Maximum supported level of concurency for the given operation.
     ALTER_TABLE_LOCK_DEFAULT,
 
-    // Allow concurrent reads & writes. If not supported, give erorr.
+    // Allow concurrent reads & writes. If not supported, give error.
     ALTER_TABLE_LOCK_NONE,
 
     // Allow concurrent reads only. If not supported, give error.
