@@ -1148,7 +1148,8 @@ err:
 bool mysql_make_view(THD *thd, TABLE_SHARE *share, TABLE_LIST *table,
                      bool open_view_no_parse)
 {
-  SELECT_LEX *end, *UNINIT_VAR(view_select);
+  SELECT_LEX_NODE *end;
+  SELECT_LEX *UNINIT_VAR(view_select);
   LEX *old_lex, *lex;
   Query_arena *arena, backup;
   TABLE_LIST *top_view= table->top_table();
@@ -1726,7 +1727,11 @@ ok:
   lex->unit.include_down(table->select_lex);
   lex->unit.slave= view_select; // fix include_down initialisation
   /* global SELECT list linking */
-  end= view_select;	// primary SELECT_LEX is always last
+  /*
+    The primary SELECT_LEX is always last (because parsed first) if WITH not
+    used, otherwise it is good start point for last element finding
+  */
+  for (end= view_select; end->link_next; end= end->link_next);
   end->link_next= old_lex->all_selects_list;
   old_lex->all_selects_list->link_prev= &end->link_next;
   old_lex->all_selects_list= lex->all_selects_list;
