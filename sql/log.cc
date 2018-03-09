@@ -46,6 +46,8 @@
 #include <stdarg.h>
 #include <m_ctype.h>				// For test_if_number
 
+#include <set_var.h> // for Sys_last_gtid_ptr
+
 #ifdef _WIN32
 #include "message.h"
 #endif
@@ -5945,7 +5947,16 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
   }
   if (err)
     DBUG_RETURN(true);
+  bool changed_gtid= (thd->last_commit_gtid.seq_no != gtid.seq_no);
   thd->last_commit_gtid= gtid;
+  if (changed_gtid &&
+      thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)->is_enabled())
+  {
+    mysql_mutex_lock(&LOCK_plugin);
+    thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)->
+      mark_as_changed(thd, (LEX_CSTRING*)Sys_last_gtid_ptr);
+    mysql_mutex_unlock(&LOCK_plugin);
+ }
 
   Gtid_log_event gtid_event(thd, seq_no, domain_id, standalone,
                             LOG_EVENT_SUPPRESS_USE_F, is_transactional,
