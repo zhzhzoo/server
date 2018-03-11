@@ -5553,6 +5553,7 @@ void TABLE_LIST::set_check_materialized()
       The subtree should be already excluded
     */
     DBUG_ASSERT(!derived->first_select()->first_inner_unit() ||
+                derived->first_select()->first_inner_unit()->with_element ||
                 derived->first_select()->first_inner_unit()->first_select()->
                 exclude_from_table_unique_test);
   }

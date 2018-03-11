@@ -220,6 +220,8 @@ public:
 
   void move_anchors_ahead(); 
 
+  bool is_referenced_by_siblings();
+
   bool is_unrestricted();
 
   bool is_with_prepared_anchor();
@@ -277,8 +279,12 @@ private:
   */
   With_clause *next_with_clause;
   /* Set to true if dependencies between with elements have been checked */
-  bool dependencies_are_checked; 
-
+  bool dependencies_are_checked;
+  /*
+    The bitmap of with elements not referenced by others
+    from this with clause
+  */
+  table_map referenced_by_siblings;
   /* 
     The bitmap of all recursive with elements whose specifications
     are not complied with restrictions imposed by the SQL standards
@@ -302,9 +308,9 @@ public:
   bool with_recursive;
 
   With_clause(bool recursive_fl, With_clause *emb_with_clause)
-    : owner(NULL),
-      embedding_with_clause(emb_with_clause), next_with_clause(NULL),
-      dependencies_are_checked(false),  unrestricted(0),
+    : owner(NULL), embedding_with_clause(emb_with_clause),
+      next_with_clause(NULL), dependencies_are_checked(false),
+      referenced_by_siblings(0), unrestricted(0),
       with_prepared_anchor(0), cleaned(0), stabilized(0),
       with_recursive(recursive_fl)
   { }
@@ -344,6 +350,12 @@ public:
   bool
   check_dependencies_in_with_clauses(With_clause *with_clauses_list);
 };
+
+inline
+bool With_element::is_referenced_by_siblings()
+{
+  return owner->referenced_by_siblings & get_elem_map();
+}
 
 inline
 bool With_element::is_unrestricted() 

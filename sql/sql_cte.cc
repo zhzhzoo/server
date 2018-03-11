@@ -732,21 +732,6 @@ bool With_clause::prepare_unreferenced_elements(THD *thd)
 }
 
 
-bool With_clause::cleanup()
-{
-  bool res= false;
-  for (With_element *with_elem= with_list.first; 
-       with_elem;
-       with_elem= with_elem->next)
-  {
-    with_elem->references= 0;
-    if (with_elem->spec->cleanup() && !res)
-      res= true;
-  }
-  return res;
-}
-
-
 /**
   @brief
     Save the specification of the given with table as a string
@@ -981,11 +966,10 @@ bool With_element::prepare_unreferenced(THD *thd)
 
   thd->lex->context_analysis_only&= ~CONTEXT_ANALYSIS_ONLY_DERIVED;
 
-#if 1
   if (!is_referenced_by_siblings() &&
        owner->owner->first_select()->first_execution)
     owner->owner->first_select()->register_unit(spec, NULL);
-#endif
+
   return rc;
 }
 
