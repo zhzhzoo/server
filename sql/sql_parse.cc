@@ -3235,6 +3235,7 @@ mysql_execute_command(THD *thd)
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
   */
   lex->first_lists_tables_same();
+  lex->fix_first_select_number();
   /* should be assigned after making first tables same */
   all_tables= lex->query_tables;
   /* set context for commands which do not use setup_tables */

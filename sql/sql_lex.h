@@ -3130,6 +3130,7 @@ public:
   TABLE_LIST *unlink_first_table(bool *link_to_local);
   void link_first_table_back(TABLE_LIST *first, bool link_to_local);
   void first_lists_tables_same();
+  void fix_first_select_number();
 
   bool can_be_merged();
   bool can_use_merged();

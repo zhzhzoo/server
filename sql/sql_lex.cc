@@ -3538,6 +3538,23 @@ void LEX::first_lists_tables_same()
   }
 }
 
+void LEX::fix_first_select_number()
+{
+  SELECT_LEX *first= first_select_lex();
+  if (first && first->select_number != 1)
+  {
+    uint num= first->select_number;
+    for (SELECT_LEX *sel= all_selects_list;
+         sel;
+         sel= sel->next_select_in_list())
+    {
+      if (sel->select_number < num)
+        sel->select_number++;
+    }
+    first->select_number= 1;
+  }
+}
+
 
 /*
   Link table back that was unlinked with unlink_first_table()

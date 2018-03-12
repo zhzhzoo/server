@@ -2319,6 +2319,7 @@ static bool check_prepared_statement(Prepared_statement *stmt)
                       sql_command, stmt->param_count));
 
   lex->first_lists_tables_same();
+  lex->fix_first_select_number();
   tables= lex->query_tables;
 
   /* set context for commands which do not use setup_tables */
