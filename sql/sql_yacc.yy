@@ -12704,6 +12704,7 @@ insert_field_spec:
             if (!(lex->insert_list= new (thd->mem_root) List_item) ||
                 lex->many_values.push_back(lex->insert_list, thd->mem_root))
               MYSQL_YYABORT;
+            lex->current_select->parsing_place= NO_MATTER;
           }
           ident_eq_list
         ;
