@@ -6361,23 +6361,24 @@ parse_vcol_expr:
         ;
 
 parenthesized_expr:
+          remember_tok_start
           query_expression
           {
             if (!Lex->expr_allows_subselect ||
                Lex->sql_command == (int)SQLCOM_PURGE)
             {
-              thd->parse_error();
+              thd->parse_error(ER_SYNTAX_ERROR, $1);
               MYSQL_YYABORT;
             }
 
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);
-            curr_sel->register_unit($1, &curr_sel->context);
-            curr_sel->add_statistics($1);
+            curr_sel->register_unit($2, &curr_sel->context);
+            curr_sel->add_statistics($2);
 
             $$= new (thd->mem_root)
-              Item_singlerow_subselect(thd, $1->first_select());
+              Item_singlerow_subselect(thd, $2->first_select());
             if ($$ == NULL)
               MYSQL_YYABORT;
           }
@@ -8720,6 +8721,7 @@ query_primary_parens:
           {
             Lex->pop_select();
             $$= $2;
+            $$->braces= TRUE;
             if ($4)
             {
               if (!$2->is_set_order_or_limit_or_lock)
@@ -8820,7 +8822,7 @@ opt_order_limit_lock_clauses:
 
 query_expression_body:
           query_primary
-          { 
+          {
             Lex->push_select($1);
           }
           opt_order_limit_lock_clauses
@@ -8838,7 +8840,7 @@ query_expression_body:
                   YYABORT;
                 if (unit->add_fake_select_lex(thd))
                   YYABORT;
-                $3->set_to(unit->fake_select_lex);                
+                $3->set_to(unit->fake_select_lex);
                 sel= Lex->wrap_unit_into_derived(unit);
                 if (!sel)
                   YYABORT;
@@ -8882,12 +8884,13 @@ query_expression:
         ;
 
 subselect:
+          remember_tok_start
           query_expression
           {
             if (!Lex->expr_allows_subselect ||
                 Lex->sql_command == (int)SQLCOM_PURGE)
             {
-              thd->parse_error();
+              thd->parse_error(ER_SYNTAX_ERROR, $1);
               MYSQL_YYABORT;
             }
 
@@ -8896,11 +8899,11 @@ subselect:
             DBUG_ASSERT(Lex->current_select == curr_sel);
             if (curr_sel)
             {
-              curr_sel->register_unit($1, &curr_sel->context);
-              curr_sel->add_statistics($1);
+              curr_sel->register_unit($2, &curr_sel->context);
+              curr_sel->add_statistics($2);
             }
 
-            $$= $1->first_select();
+            $$= $2->first_select();
           }
         ;
 
