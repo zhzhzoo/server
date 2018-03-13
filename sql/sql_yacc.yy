@@ -2198,10 +2198,13 @@ execute:
           {
             Lex->pop_select(); //main select
           }
-        | EXECUTE_SYM IMMEDIATE_SYM prepare_src
+        | EXECUTE_SYM IMMEDIATE_SYM
           {
             if (Lex->main_select_push())
               MYSQL_YYABORT;
+          }
+          prepare_src
+          {
             if (Lex->table_or_sp_used())
               my_yyabort_error((ER_SUBQUERIES_NOT_SUPPORTED, MYF(0),
                                "EXECUTE IMMEDIATE"));
