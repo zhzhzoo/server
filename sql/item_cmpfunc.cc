@@ -41,10 +41,14 @@ static Item** cache_converted_constant(THD *thd, Item **value,
   find an temporal type (item) that others will be converted to
   for the purpose of comparison.
 
+  for IN/CASE conversion only happens if the first item defines the
+  comparison context.
+
   this is the type that will be used in warnings like
   "Incorrect <<TYPE>> value".
 */
-static Item *find_date_time_item(THD *thd, Item **args, uint nargs, uint col)
+static Item *find_date_time_item(THD *thd, Item **args, uint nargs, uint col,
+                                 bool in_case)
 {
   Item *date_arg= 0, **arg, **arg_end;
   for (arg= args, arg_end= args + nargs; arg != arg_end ; arg++)
@@ -57,7 +61,7 @@ static Item *find_date_time_item(THD *thd, Item **args, uint nargs, uint col)
     if (item->field_type() == MYSQL_TYPE_DATETIME)
       break;
   }
-  if (date_arg)
+  if (in_case ? date_arg == args[0]->element_index(col) : date_arg != NULL)
   {
     enum_field_types f_type= date_arg->field_type();
     for (arg= args, arg_end= args + nargs; arg != arg_end ; arg++)
@@ -2121,7 +2125,7 @@ void Item_func_between::fix_length_and_dec()
     strings as.
   */
   if (m_compare_type ==  TIME_RESULT)
-    compare_as_dates= find_date_time_item(thd, args, 3, 0);
+    compare_as_dates= find_date_time_item(thd, args, 3, 0, false);
 
   /* See the comment for Item_func::convert_const_compared_to_int_field */
   if (args[0]->real_item()->type() == FIELD_ITEM &&
@@ -3186,7 +3190,7 @@ void Item_func_case::fix_length_and_dec()
 
     Item *date_arg= 0;
     if (m_found_types & (1U << TIME_RESULT))
-      date_arg= find_date_time_item(current_thd, args, nwhens + 1, 0);
+      date_arg= find_date_time_item(current_thd, args, nwhens + 1, 0, true);
 
     if (m_found_types & (1U << STRING_RESULT))
     {
@@ -4195,7 +4199,7 @@ void Item_func_in::fix_length_and_dec()
 
       for (uint col= 0; col < cols; col++)
       {
-        date_arg= find_date_time_item(thd, args, arg_count, col);
+        date_arg= find_date_time_item(thd, args, arg_count, col, true);
         if (date_arg)
         {
           cmp_item **cmp= 0;
@@ -4261,7 +4265,7 @@ void Item_func_in::fix_length_and_dec()
       array= new (thd->mem_root) in_decimal(thd, arg_count - 1);
       break;
     case TIME_RESULT:
-      date_arg= find_date_time_item(thd, args, arg_count, 0);
+      date_arg= find_date_time_item(thd, args, arg_count, 0, true);
       array= new (thd->mem_root) in_datetime(thd, date_arg, arg_count - 1);
       break;
     }
@@ -4288,7 +4292,7 @@ void Item_func_in::fix_length_and_dec()
   else
   {
     if (found_types & (1U << TIME_RESULT))
-      date_arg= find_date_time_item(thd, args, arg_count, 0);
+      date_arg= find_date_time_item(thd, args, arg_count, 0, true);
     if (found_types & (1U << STRING_RESULT) &&
         agg_arg_charsets_for_comparison(cmp_collation, args, arg_count))
       return;
