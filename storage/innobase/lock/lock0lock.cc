@@ -649,7 +649,9 @@ lock_reset_lock_and_trx_wait(
 {
 	ut_ad(lock_get_wait(lock));
 	ut_ad(lock_mutex_own());
-
+#ifdef WITH_WSREP
+	ut_ad(wsrep_on(lock->trx->mysql_thd)
+	      || lock->trx->lock.wait_lock == lock);
 	if (lock->trx->lock.wait_lock &&
 	    lock->trx->lock.wait_lock != lock) {
 		const char*	stmt=NULL;
@@ -686,7 +688,9 @@ lock_reset_lock_and_trx_wait(
 
 		ut_ad(0);
 	}
-
+#else
+	ut_ad(lock->trx->lock.wait_lock == lock);
+#endif
 	lock->trx->lock.wait_lock = NULL;
 	lock->type_mode &= ~LOCK_WAIT;
 }
