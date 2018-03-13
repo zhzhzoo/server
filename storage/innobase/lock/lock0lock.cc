@@ -1289,7 +1289,7 @@ wsrep_kill_victim(
 
 			lock->trx->abort_type = TRX_WSREP_ABORT;
 			wsrep_innobase_kill_one_trx(trx->mysql_thd,
-				(const trx_t*) trx, lock->trx, TRUE);
+						    trx, lock->trx, TRUE);
 			lock->trx->abort_type = TRX_SERVER_ABORT;
 		}
 	}
@@ -5709,22 +5709,20 @@ lock_rec_queue_validate(
 		/* impl_trx cannot be committed until lock_mutex_exit()
 		because lock_trx_release_locks() acquires lock_sys->mutex */
 
-		if (impl_trx != NULL) {
-			const lock_t*	other_lock
-				= lock_rec_other_has_expl_req(
-					LOCK_S, block, true, heap_no,
-					impl_trx);
-
+		if (!impl_trx) {
+		} else if (const lock_t* other_lock
+			   = lock_rec_other_has_expl_req(
+				   LOCK_S, block, true, heap_no,
+				   impl_trx)) {
 			/* The impl_trx is holding an implicit lock on the
 			given record 'rec'. So there cannot be another
 			explicit granted lock.  Also, there can be another
 			explicit waiting lock only if the impl_trx has an
 			explicit granted lock. */
 
-			if (other_lock != NULL) {
 #ifdef WITH_WSREP
-				if (wsrep_on(other_lock->trx->mysql_thd) && !lock_get_wait(other_lock) ) {
-
+			if (wsrep_on(other_lock->trx->mysql_thd)) {
+				if (!lock_get_wait(other_lock) ) {
 					ib::info() << "WSREP impl BF lock conflict for my impl lock:\n BF:" <<
 						((wsrep_thd_is_BF(impl_trx->mysql_thd, FALSE)) ? "BF" : "normal") << " exec: " <<
 						wsrep_thd_exec_mode(impl_trx->mysql_thd) << " conflict: " <<
@@ -5742,18 +5740,19 @@ lock_rec_queue_validate(
 						wsrep_thd_query(otrx->mysql_thd);
 				}
 
-				if (wsrep_on(other_lock->trx->mysql_thd) && !lock_rec_has_expl(
-					LOCK_X | LOCK_REC_NOT_GAP,
-					block, heap_no, impl_trx)) {
+				if (!lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP,
+						       block, heap_no,
+						       impl_trx)) {
 					ib::info() << "WSREP impl BF lock conflict";
 				}
-#else /* !WITH_WSREP */
-				ut_a(lock_get_wait(other_lock));
-				ut_a(lock_rec_has_expl(
-					LOCK_X | LOCK_REC_NOT_GAP,
-					block, heap_no, impl_trx));
+			} else {
 #endif /* WITH_WSREP */
+			ut_a(lock_get_wait(other_lock));
+			ut_a(lock_rec_has_expl(LOCK_X | LOCK_REC_NOT_GAP,
+					       block, heap_no, impl_trx));
+#ifdef WITH_WSREP
 			}
+#endif /* WITH_WSREP */
 		}
 	}
 
@@ -7611,23 +7610,18 @@ DeadlockChecker::select_victim() const
 #ifdef WITH_WSREP
 		if (wsrep_thd_is_BF(m_start->mysql_thd, TRUE)) {
 			return(m_wait_lock->trx);
-		} else {
-#endif /* WITH_WSREP */
-			return(m_start);
-#ifdef WITH_WSREP
 		}
-#endif
+#endif /* WITH_WSREP */
+		return(m_start);
 	}
 
 #ifdef WITH_WSREP
 	if (wsrep_thd_is_BF(m_wait_lock->trx->mysql_thd, TRUE)) {
 		return(m_start);
-	} else {
-#endif /* WITH_WSREP */
-		return(m_wait_lock->trx);
-#ifdef WITH_WSREP
 	}
-#endif
+#endif /* WITH_WSREP */
+
+	return(m_wait_lock->trx);
 }
 
 /** Looks iteratively for a deadlock. Note: the joining transaction may
