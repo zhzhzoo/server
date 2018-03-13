@@ -7136,71 +7136,27 @@ the wait lock.
 dberr_t
 lock_trx_handle_wait(
 /*=================*/
-	trx_t*	trx,	/*!< in/out: trx lock state */
-	bool	lock_mutex_taken,
-	bool	trx_mutex_taken)
+	trx_t*	trx)	/*!< in/out: trx lock state */
 {
-	dberr_t	err=DB_SUCCESS;
-	bool take_lock_mutex = false;
-	bool take_trx_mutex = false;
+	lock_mutex_enter();
+	trx_mutex_enter(trx);
 
-	if (!lock_mutex_taken) {
-		ut_ad(!lock_mutex_own());
-		lock_mutex_enter();
-		take_lock_mutex = true;
-	}
-
-	if (!trx_mutex_taken) {
-		ut_ad(!trx_mutex_own(trx));
-		trx_mutex_enter(trx);
-		take_trx_mutex = true;
-	}
+	dberr_t err;
 
 	if (trx->lock.was_chosen_as_deadlock_victim) {
 		err = DB_DEADLOCK;
-	} else if (trx->lock.wait_lock != NULL) {
-		bool take_wait_trx_mutex = false;
-		trx_t* wait_trx = trx->lock.wait_lock->trx;
-
-		/* We take trx mutex for waiting trx if we have not yet
-		already taken it or we know that waiting trx and parameter
-		trx are not same and we are not already holding trx mutex. */
-		if ((wait_trx && wait_trx == trx && !take_trx_mutex && !trx_mutex_taken) ||
-		    (wait_trx && wait_trx != trx && wait_trx->abort_type == TRX_SERVER_ABORT)) {
-			ut_ad(!trx_mutex_own(wait_trx));
-			trx_mutex_enter(wait_trx);
-			take_wait_trx_mutex = true;
-		}
-
-		ut_ad(trx_mutex_own(wait_trx));
-
+	} else if (trx->lock.wait_lock) {
 		lock_cancel_waiting_and_release(trx->lock.wait_lock);
-
-		if (wait_trx && take_wait_trx_mutex) {
-			ut_ad(trx_mutex_own(wait_trx));
-			trx_mutex_exit(wait_trx);
-		}
-
 		err = DB_LOCK_WAIT;
 	} else {
 		/* The lock was probably granted before we got here. */
 		err = DB_SUCCESS;
 	}
 
-	if (take_lock_mutex) {
-		ut_ad(lock_mutex_own());
-		lock_mutex_exit();
-	}
+	lock_mutex_exit();
+	trx_mutex_exit(trx);
 
-	if (take_trx_mutex) {
-		ut_ad(trx_mutex_own(trx));
-		trx_mutex_exit(trx);
-	}
-
-	ut_ad(err == DB_SUCCESS || err == DB_LOCK_WAIT
-	      || err == DB_DEADLOCK);
-
-	return(err);
+	return err;
 }
 
 /*********************************************************************//**

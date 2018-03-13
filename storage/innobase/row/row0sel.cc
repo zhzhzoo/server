@@ -5004,7 +5004,7 @@ no_gap_lock:
 			release the lock it is waiting on. */
 
 			trx->abort_type = TRX_SERVER_ABORT;
-			err = lock_trx_handle_wait(trx, false, false);
+			err = lock_trx_handle_wait(trx);
 
 			switch (err) {
 			case DB_SUCCESS:
