@@ -11521,6 +11521,7 @@ table_primary_derived:
             LEX *lex=Lex;
             lex->derived_tables|= DERIVED_SUBQUERY;
             $1->linkage= DERIVED_TABLE_TYPE;
+            $1->braces= FALSE;
             // Add the subtree of subquery to the current SELECT_LEX
             SELECT_LEX *curr_sel= Lex->select_stack_head();
             DBUG_ASSERT(Lex->current_select == curr_sel);
