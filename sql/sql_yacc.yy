@@ -3166,8 +3166,13 @@ call:
           {
             if (Lex->call_statement_start(thd, $2))
               MYSQL_YYABORT;
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
           }
-          opt_sp_cparam_list {}
+          opt_sp_cparam_list
+          {
+            Lex->pop_select(); //main select
+          }
         ;
 
 /* CALL parameters */
@@ -4151,9 +4156,14 @@ sp_fetch_list:
         ;
 
 sp_if:
-          { Lex->sphead->reset_lex(thd); }
+          {
+            Lex->sphead->reset_lex(thd);
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
+          }
           expr THEN_SYM
           {
+            Lex->pop_select(); //main select
             LEX *lex= Lex;
             sp_head *sp= lex->sphead;
             sp_pcontext *ctx= lex->spcont;
@@ -4265,12 +4275,18 @@ case_stmt_specification:
         ;
 
 case_stmt_body:
-          { Lex->sphead->reset_lex(thd); /* For expr $2 */ }
+          {
+            Lex->sphead->reset_lex(thd); /* For expr $2 */
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
+          }
           expr
           {
             if (Lex->case_stmt_action_expr($2))
               MYSQL_YYABORT;
 
+            Lex->pop_select(); //main select
             if (Lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
           }
@@ -4294,6 +4310,9 @@ simple_when_clause:
           WHEN_SYM
           {
             Lex->sphead->reset_lex(thd); /* For expr $3 */
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
           }
           expr
           {
@@ -4302,6 +4321,8 @@ simple_when_clause:
             LEX *lex= Lex;
             if (lex->case_stmt_action_when($3, true))
               MYSQL_YYABORT;
+
+            lex->pop_select(); //main select
             /* For expr $3 */
             if (lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
@@ -4318,12 +4339,17 @@ searched_when_clause:
           WHEN_SYM
           {
             Lex->sphead->reset_lex(thd); /* For expr $3 */
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
           }
           expr
           {
             LEX *lex= Lex;
             if (lex->case_stmt_action_when($3, false))
               MYSQL_YYABORT;
+
+            lex->pop_select(); //main select
             /* For expr $3 */
             if (lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
@@ -4431,6 +4457,7 @@ while_body:
             LEX *lex= Lex;
             if (lex->sp_while_loop_expression(thd, $1))
               MYSQL_YYABORT;
+            Lex->pop_select(); //main select pushed before while_body use
             if (lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
           }
@@ -4443,7 +4470,12 @@ while_body:
 
 repeat_body:
           sp_proc_stmts1 UNTIL_SYM 
-          { Lex->sphead->reset_lex(thd); }
+          {
+            Lex->sphead->reset_lex(thd);
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
+          }
           expr END REPEAT_SYM
           {
             LEX *lex= Lex;
@@ -4454,6 +4486,8 @@ repeat_body:
             if (i == NULL ||
                 lex->sphead->add_instr(i))
               MYSQL_YYABORT;
+
+            lex->pop_select(); //main select
             if (lex->sphead->restore_lex(thd))
               MYSQL_YYABORT;
             /* We can shortcut the cont_backpatch here */
@@ -4482,9 +4516,14 @@ sp_labeled_control:
             if (Lex->sp_push_loop_label(thd, &$1))
               MYSQL_YYABORT;
             Lex->sphead->reset_lex(thd);
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
           }
           while_body pop_sp_loop_label
-          { }
+          {
+            // while body pop main select
+          }
         | label_ident ':' REPEAT_SYM
           {
             if (Lex->sp_push_loop_label(thd, &$1))
@@ -4509,9 +4548,13 @@ sp_unlabeled_control:
             if (Lex->sp_push_loop_empty_label(thd))
               MYSQL_YYABORT;
             Lex->sphead->reset_lex(thd);
+
+            if (Lex->main_select_push())
+              MYSQL_YYABORT;
           }
           while_body
           {
+            // while body pop main select
             Lex->sp_pop_loop_empty_label(thd);
           }
         | REPEAT_SYM
