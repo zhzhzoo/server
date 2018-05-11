@@ -3413,6 +3413,10 @@ mysql_execute_command(THD *thd)
 #ifdef HAVE_REPLICATION
   } /* endif unlikely slave */
 #endif
+
+  Opt_trace_start ots(&thd->opt_trace, thd->query(), thd->query_length(),
+                      thd->variables.character_set_client);
+
 #ifdef WITH_WSREP
   if  (wsrep && WSREP(thd))
   {

@@ -9703,6 +9703,7 @@ ST_FIELD_INFO spatial_ref_sys_fields_info[]=
 };
 #endif /*HAVE_SPATIAL*/
 
+extern ST_FIELD_INFO optimizer_trace_info[];
 
 /*
   Description of ST_FIELD_INFO in table.h
@@ -9754,6 +9755,8 @@ ST_SCHEMA_TABLE schema_tables[]=
    OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
   {"OPEN_TABLES", open_tables_fields_info, 0,
    fill_open_tables, make_old_format, 0, -1, -1, 1, 0},
+  {"OPTIMIZER_TRACE", optimizer_trace_info, 0,
+   fill_optimizer_trace_info, 0, 0, -1, -1, 0, 0},
   {"PARAMETERS", parameters_fields_info, 0,
    fill_schema_proc, 0, 0, -1, -1, 0, 0},
   {"PARTITIONS", partitions_fields_info, 0,
