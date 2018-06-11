@@ -28,7 +28,7 @@
 #include "rpl_tblmap.h"
 #include "mdl.h"
 #include "field.h"                              // Create_field
-#include "opt_trace.h"      /* Opt_trace_ctx */
+#include "opt_trace_ctx.h"  /* Opt_trace_ctx */
 #include "probes_mysql.h"
 #include "sql_locale.h"     /* my_locale_st */
 #include "sql_profile.h"    /* PROFILING */
@@ -603,6 +603,7 @@ typedef struct system_variables
   ulong optimizer_prune_level;
   ulong optimizer_search_depth;
   ulong optimizer_selectivity_sampling_limit;
+  ulong optimizer_trace;
   ulong optimizer_use_condition_selectivity;
   ulong use_stat_tables;
   ulong histogram_size;

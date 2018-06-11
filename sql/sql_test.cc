@@ -23,6 +23,7 @@
 #include "sql_base.h"
 #include "sql_show.h" // calc_sum_of_all_status
 #include "sql_select.h"
+#include "opt_trace.h"
 #include "keycaches.h"
 #include <hash.h>
 #include <thr_alarm.h>
@@ -224,10 +225,11 @@ TEST_join(JOIN *join)
   DBUG_VOID_RETURN;
 }
 
+#endif
 
 #define FT_KEYPART   (MAX_FIELDS+10)
 
-static void print_keyuse(KEYUSE *keyuse)
+static void print_keyuse(KEYUSE *keyuse, Opt_trace_ctx *trace)
 {
   char buff[256];
   char buf2[64]; 
@@ -245,24 +247,30 @@ static void print_keyuse(KEYUSE *keyuse)
   else
     fieldname= key_info->key_part[keyuse->keypart].field->field_name.str;
   ll2str(keyuse->used_tables, buf2, 16, 0); 
-  fprintf(DBUG_FILE, "KEYUSE: %s.%s=%s  optimize: %u  used_tables: %s "
+  DBUG_EXECUTE("opt", fprintf(DBUG_FILE, "KEYUSE: %s.%s=%s  optimize: %u  used_tables: %s "
           "ref_table_rows: %lu  keypart_map: %0lx\n",
           keyuse->table->alias.c_ptr(), fieldname, str.ptr(),
           (uint) keyuse->optimize, buf2, (ulong) keyuse->ref_table_rows, 
-          (ulong) keyuse->keypart_map);
+          (ulong) keyuse->keypart_map););
+  Opt_trace_object(trace)
+    .add("table", keyuse->table->pos_in_table_list)
+    .add("field", fieldname)
+    .add("equals", str.ptr())
+    .add("null_rejecting", keyuse->null_rejecting);
 }
 
 
 /* purecov: begin inspected */
-void print_keyuse_array(DYNAMIC_ARRAY *keyuse_array)
+void print_keyuse_array(DYNAMIC_ARRAY *keyuse_array, Opt_trace_ctx *trace)
 {
   DBUG_LOCK_FILE;
-  fprintf(DBUG_FILE, "KEYUSE array (%d elements)\n", keyuse_array->elements);
+  DBUG_EXECUTE("opt", fprintf(DBUG_FILE, "KEYUSE array (%d elements)\n", keyuse_array->elements););
+  Opt_trace_object wrapper(trace);
+  Opt_trace_array trace_array(trace, "ref_optimizer_key_uses");
   for(uint i=0; i < keyuse_array->elements; i++)
-    print_keyuse((KEYUSE*)dynamic_array_ptr(keyuse_array, i));
+    print_keyuse((KEYUSE*)dynamic_array_ptr(keyuse_array, i), trace);
   DBUG_UNLOCK_FILE;
 }
-
 
 /* 
   Print the current state during query optimization.
@@ -393,8 +401,6 @@ Item_equal* (List<Item_equal>:: *dbug_list_item_equal_elem_ptr)(uint)=
   &List<Item_equal>::elem;
 TABLE_LIST* (List<TABLE_LIST>:: *dbug_list_table_list_elem_ptr)(uint) =
   &List<TABLE_LIST>::elem;
-
-#endif
 
 typedef struct st_debug_lock
 {

@@ -50,6 +50,7 @@
 #include "filesort.h"            // filesort_free_buffers
 #include "sql_union.h"           // mysql_union
 #include "opt_subselect.h"
+#include "opt_trace.h"
 #include "sql_derived.h"
 #include "sql_statistics.h"
 #include "sql_cte.h"
@@ -74,7 +75,7 @@
   Hash Join code stores field->field_index in KEYUSE::keypart, so the 
   number needs to be bigger than MAX_FIELDS, also.
 
-  CAUTION: sql_test.cc has its own definition of FT_KEYPART.
+  CAUTION: sql_test.cc, opt_trace.cc has their own definitions of FT_KEYPART.
 */
 #define FT_KEYPART   (MAX_FIELDS+10)
 
@@ -1419,6 +1420,12 @@ bool JOIN::build_explain()
 int JOIN::optimize()
 {
   int res= 0;
+
+  Opt_trace_ctx *const trace = &thd->opt_trace;
+  Opt_trace_object trace_optimize(trace, "join_optimization");
+  trace_optimize.add("select #", select_lex->select_number);
+  Opt_trace_object trace_wrapper(trace, "steps");
+
   join_optimization_state init_state= optimization_state;
   if (optimization_state == JOIN::OPTIMIZATION_PHASE_1_DONE)
     res= optimize_stage2();
@@ -1489,6 +1496,11 @@ JOIN::optimize_inner()
   DBUG_ENTER("JOIN::optimize");
   subq_exit_fl= false;
   do_send_rows = (unit->select_limit_cnt) ? 1 : 0;
+
+  Opt_trace_ctx *const trace = &thd->opt_trace;
+  Opt_trace_object trace_optimize_inner(trace, "inner");
+  trace_optimize_inner.add("select #", select_lex->select_number);
+  Opt_trace_array trace_steps(trace, "steps");
 
   DEBUG_SYNC(thd, "before_join_optimize");
 
@@ -1858,6 +1870,7 @@ setup_subq_exit:
     optimization_state= JOIN::OPTIMIZATION_PHASE_1_DONE;
   else
   { 
+    Opt_trace_object stage2_wrapper(trace);
     if (optimize_stage2())
       DBUG_RETURN(1);
   }
@@ -1871,6 +1884,11 @@ int JOIN::optimize_stage2()
   uint no_jbuf_after;
   JOIN_TAB *tab;
   DBUG_ENTER("JOIN::optimize_stage2");
+
+  Opt_trace_ctx *const trace = &thd->opt_trace;
+  Opt_trace_object trace_optimize_stage2(trace, "stage2");
+  trace_optimize_stage2.add("select #", select_lex->select_number);
+  Opt_trace_array trace_steps(trace, "steps");
 
   if (subq_exit_fl)
     goto setup_subq_exit;
@@ -4456,7 +4474,7 @@ make_join_statistics(JOIN *join, List<TABLE_LIST> &tables_list,
         sort_and_filter_keyuse(join->thd, keyuse_array,
                                skip_unprefixed_keyparts))
       goto error;
-    DBUG_EXECUTE("opt", print_keyuse_array(keyuse_array););
+    print_keyuse_array(keyuse_array, &join->thd->opt_trace);
   }
 
   join->const_table_map= no_rows_const_tables;
@@ -4741,133 +4759,149 @@ make_join_statistics(JOIN *join, List<TABLE_LIST> &tables_list,
 
   /* Calc how many (possible) matched records in each table */
 
-  for (s=stat ; s < stat_end ; s++)
   {
-    s->startup_cost= 0;
-    if (s->type == JT_SYSTEM || s->type == JT_CONST)
+    Opt_trace_ctx *trace = &join->thd->opt_trace;
+    Opt_trace_object wrapper(trace);
+    Opt_trace_array trace_array(trace, "rows_estimation");
+    for (s=stat ; s < stat_end ; s++)
     {
-      /* Only one matching row */
-      s->found_records= s->records= 1;
-      s->read_time=1.0; 
-      s->worst_seeks=1.0;
-      continue;
-    }
-    /* Approximate found rows and time to read them */
-    if (s->table->is_filled_at_execution())
-    {
-      get_delayed_table_estimates(s->table, &s->records, &s->read_time,
-                                  &s->startup_cost);
-      s->found_records= s->records;
-      table->quick_condition_rows=s->records;
-    }
-    else
-    {
-       s->scan_time();
-    }
+      Opt_trace_object trace_table(trace);
+      trace_table.add("table", s->tab_list);
+      s->startup_cost= 0;
+      if (s->type == JT_SYSTEM || s->type == JT_CONST)
+      {
+        trace_table.add("rows", 1)
+                   .add("cost", 1)
+                   .add("table_type",
+                       (s->type == JT_SYSTEM) ? "system" : "const");
+        /* Only one matching row */
+        s->found_records= s->records= 1;
+        s->read_time=1.0; 
+        s->worst_seeks=1.0;
+        continue;
+      }
+      /* Approximate found rows and time to read them */
+      if (s->table->is_filled_at_execution())
+      {
+        get_delayed_table_estimates(s->table, &s->records, &s->read_time,
+            &s->startup_cost);
+        s->found_records= s->records;
+        table->quick_condition_rows=s->records;
+      }
+      else
+      {
+        s->scan_time();
+      }
 
-    if (s->table->is_splittable())
-      s->add_keyuses_for_splitting();
+      if (s->table->is_splittable())
+        s->add_keyuses_for_splitting();
 
-    /*
-      Set a max range of how many seeks we can expect when using keys
-      This is can't be to high as otherwise we are likely to use
-      table scan.
-    */
-    s->worst_seeks= MY_MIN((double) s->found_records / 10,
-			(double) s->read_time*3);
-    if (s->worst_seeks < 2.0)			// Fix for small tables
-      s->worst_seeks=2.0;
+      /*
+         Set a max range of how many seeks we can expect when using keys
+         This is can't be to high as otherwise we are likely to use
+         table scan.
+       */
+      s->worst_seeks= MY_MIN((double) s->found_records / 10,
+        (double) s->read_time*3);
+      if (s->worst_seeks < 2.0)			// Fix for small tables
+        s->worst_seeks=2.0;
 
-    /*
-      Add to stat->const_keys those indexes for which all group fields or
-      all select distinct fields participate in one index.
-    */
-    add_group_and_distinct_keys(join, s);
+      /*
+         Add to stat->const_keys those indexes for which all group fields or
+         all select distinct fields participate in one index.
+       */
+      add_group_and_distinct_keys(join, s);
 
-    s->table->cond_selectivity= 1.0;
+      s->table->cond_selectivity= 1.0;
     
-    /*
-      Perform range analysis if there are keys it could use (1). 
-      Don't do range analysis if we're on the inner side of an outer join (2).
-      Do range analysis if we're on the inner side of a semi-join (3).
-      Don't do range analysis for materialized subqueries (4).
-      Don't do range analysis for materialized derived tables (5)
-    */
-    if ((!s->const_keys.is_clear_all() ||
-	 !bitmap_is_clear_all(&s->table->cond_set)) &&              // (1)
-        (!s->table->pos_in_table_list->embedding ||                 // (2)
-         (s->table->pos_in_table_list->embedding &&                 // (3)
-          s->table->pos_in_table_list->embedding->sj_on_expr)) &&   // (3)
-        !s->table->is_filled_at_execution() &&                      // (4)
-        !(s->table->pos_in_table_list->derived &&                   // (5)
-          s->table->pos_in_table_list->is_materialized_derived()))  // (5)
-    {
-      bool impossible_range= FALSE;
-      ha_rows records= HA_POS_ERROR;
-      SQL_SELECT *select= 0;
-      if (!s->const_keys.is_clear_all())
+      /*
+         Perform range analysis if there are keys it could use (1). 
+         Don't do range analysis if we're on the inner side of an outer join (2).
+         Do range analysis if we're on the inner side of a semi-join (3).
+         Don't do range analysis for materialized subqueries (4).
+         Don't do range analysis for materialized derived tables (5)
+       */
+      if ((!s->const_keys.is_clear_all() ||
+	   !bitmap_is_clear_all(&s->table->cond_set)) &&              // (1)
+          (!s->table->pos_in_table_list->embedding ||                 // (2)
+           (s->table->pos_in_table_list->embedding &&                 // (3)
+            s->table->pos_in_table_list->embedding->sj_on_expr)) &&   // (3)
+          !s->table->is_filled_at_execution() &&                      // (4)
+          !(s->table->pos_in_table_list->derived &&                   // (5)
+            s->table->pos_in_table_list->is_materialized_derived()))  // (5)
       {
-        select= make_select(s->table, found_const_table_map,
-			    found_const_table_map,
-			    *s->on_expr_ref ? *s->on_expr_ref : join->conds,
-                            (SORT_INFO*) 0,
-			    1, &error);
-        if (!select)
-          goto error;
-        records= get_quick_record_count(join->thd, select, s->table,
-				        &s->const_keys, join->row_limit);
-        /* Range analyzer could modify the condition. */
-        if (*s->on_expr_ref)
-          *s->on_expr_ref= select->cond;
-        else
-          join->conds= select->cond;
-
-        s->quick=select->quick;
-        s->needed_reg=select->needed_reg;
-        select->quick=0;
-        impossible_range= records == 0 && s->table->reginfo.impossible_range;
-      }
-      if (!impossible_range)
-      {
-        if (join->thd->variables.optimizer_use_condition_selectivity > 1)
-          calculate_cond_selectivity_for_table(join->thd, s->table, 
-                                               *s->on_expr_ref ?
-                                               s->on_expr_ref : &join->conds);
-        if (s->table->reginfo.impossible_range)
-	{
-          impossible_range= TRUE;
-          records= 0;
+        bool impossible_range= FALSE;
+        ha_rows records= HA_POS_ERROR;
+        SQL_SELECT *select= 0;
+        if (!s->const_keys.is_clear_all())
+        {
+          select= make_select(s->table, found_const_table_map,
+			      found_const_table_map,
+			      *s->on_expr_ref ? *s->on_expr_ref : join->conds,
+                              (SORT_INFO*) 0,
+			      1, &error);
+          if (!select)
+            goto error;
+          records= get_quick_record_count(join->thd, select, s->table,
+				          &s->const_keys, join->row_limit);
+          /* Range analyzer could modify the condition. */
+          if (*s->on_expr_ref)
+            *s->on_expr_ref= select->cond;
+          else
+            join->conds= select->cond;
+  
+          s->quick=select->quick;
+          s->needed_reg=select->needed_reg;
+          select->quick=0;
+          impossible_range= records == 0 && s->table->reginfo.impossible_range;
         }
+        if (!impossible_range)
+        {
+          if (join->thd->variables.optimizer_use_condition_selectivity > 1)
+            calculate_cond_selectivity_for_table(join->thd, s->table, 
+                                                 *s->on_expr_ref ?
+                                                 s->on_expr_ref : &join->conds);
+          if (s->table->reginfo.impossible_range)
+          {
+            impossible_range= TRUE;
+            records= 0;
+          }
+        }
+        if (impossible_range)
+        {
+          /*
+             Impossible WHERE or ON expression
+             In case of ON, we mark that the we match one empty NULL row.
+             In case of WHERE, don't set found_const_table_map to get the
+             caller to abort with a zero row result.
+           */
+          join->const_table_map|= s->table->map;
+          set_position(join,const_count++,s,(KEYUSE*) 0);
+          s->type= JT_CONST;
+          s->table->const_table= 1;
+          if (*s->on_expr_ref)
+          {
+            /* Generate empty row */
+            s->info= ET_IMPOSSIBLE_ON_CONDITION;
+            found_const_table_map|= s->table->map;
+            mark_as_null_row(s->table);		// All fields are NULL
+          }
+        }
+        if (records != HA_POS_ERROR)
+        {
+          s->found_records=records;
+          s->read_time= s->quick ? s->quick->read_time : 0.0;
+        }
+        if (select)
+          delete select;
       }
-      if (impossible_range)
+      else
       {
-	/*
-	  Impossible WHERE or ON expression
-	  In case of ON, we mark that the we match one empty NULL row.
-	  In case of WHERE, don't set found_const_table_map to get the
-	  caller to abort with a zero row result.
-	*/
-	join->const_table_map|= s->table->map;
-	set_position(join,const_count++,s,(KEYUSE*) 0);
-	s->type= JT_CONST;
-        s->table->const_table= 1;
-	if (*s->on_expr_ref)
-	{
-	  /* Generate empty row */
-	  s->info= ET_IMPOSSIBLE_ON_CONDITION;
-	  found_const_table_map|= s->table->map;
-	  mark_as_null_row(s->table);		// All fields are NULL
-	}
+        Opt_trace_object(trace, "table_scan")
+          .add("rows", s->found_records)
+          .add("cost", s->read_time);
       }
-      if (records != HA_POS_ERROR)
-      {
-	s->found_records=records;
-	s->read_time= s->quick ? s->quick->read_time : 0.0;
-      }
-      if (select)
-        delete select;
     }
-
   }
 
   if (pull_out_semijoin_tables(join))
@@ -15701,13 +15735,25 @@ optimize_cond(JOIN *join, COND *conds,
 {
   THD *thd= join->thd;
   DBUG_ENTER("optimize_cond");
+  Opt_trace_ctx *trace = &thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object trace_cond(trace, "condition_processing");
+  trace_cond.add("condition", join_list ? "WHERE" : "HAVING");
+  trace_cond.add("original_condition", conds);
+  Opt_trace_array trace_steps(trace, "steps");
 
   if (!conds)
   {
+    Opt_trace_object step_wrapper(trace);
+    step_wrapper.add("transformation", "equality_propagation");
     *cond_value= Item::COND_TRUE;
     if (!ignore_on_conds)
+    {
+      Opt_trace_array trace_subselect(trace, "subselect_evaluation");
       build_equal_items(join, NULL, NULL, join_list, ignore_on_conds,
                         cond_equal);
+    }
+    step_wrapper.add("resulting_condition", conds);
   }  
   else
   {
@@ -15719,24 +15765,49 @@ optimize_cond(JOIN *join, COND *conds,
       predicate. Substitute a constant instead of this field if the
       multiple equality contains a constant.
     */ 
-    DBUG_EXECUTE("where", print_where(conds, "original", QT_ORDINARY););
-    conds= build_equal_items(join, conds, NULL, join_list, 
-                             ignore_on_conds, cond_equal,
-                             MY_TEST(flags & OPT_LINK_EQUAL_FIELDS));
-    DBUG_EXECUTE("where",print_where(conds,"after equal_items", QT_ORDINARY););
+    {
+      Opt_trace_object step_wrapper(trace);
+      step_wrapper.add("transformation", "equality_propagation");
+      DBUG_EXECUTE("where", print_where(conds, "original", QT_ORDINARY););
+      {
+        Opt_trace_array trace_subselect(trace, "subselect_evaluation");
+        conds = build_equal_items(join, conds, NULL, join_list, 
+                                  ignore_on_conds, cond_equal,
+                                  MY_TEST(flags & OPT_LINK_EQUAL_FIELDS));
+      }
+      step_wrapper.add("resulting_condition", conds);
+      DBUG_EXECUTE("where",print_where(conds,"after equal_items", QT_ORDINARY););
+    }
 
     /* change field = field to field = const for each found field = const */
-    propagate_cond_constants(thd, (I_List<COND_CMP> *) 0, conds, conds);
+    {
+      Opt_trace_object step_wrapper(trace);
+      step_wrapper.add("transformation", "constant_propagation");
+      {
+        Opt_trace_array trace_subselect(trace, "subselect_evaluation");
+        propagate_cond_constants(thd, (I_List<COND_CMP> *) 0, conds, conds);
+      }
+      step_wrapper.add("resulting_condition", conds);
+      DBUG_EXECUTE("where",print_where(conds,"after const change", QT_ORDINARY););
+    }
+
     /*
       Remove all instances of item == item
       Remove all and-levels where CONST item != CONST item
     */
-    DBUG_EXECUTE("where",print_where(conds,"after const change", QT_ORDINARY););
-    conds= conds->remove_eq_conds(thd, cond_value, true);
-    if (conds && conds->type() == Item::COND_ITEM &&
-        ((Item_cond*) conds)->functype() == Item_func::COND_AND_FUNC)
-      *cond_equal= &((Item_cond_and*) conds)->m_cond_equal;
-    DBUG_EXECUTE("info",print_where(conds,"after remove", QT_ORDINARY););
+    {
+      Opt_trace_object step_wrapper(trace);
+      step_wrapper.add("transformation", "trivial_condition_removal");
+      {
+        Opt_trace_array trace_subselect(trace, "subselect_evaluation");
+        conds = conds->remove_eq_conds(thd, cond_value, true);
+      }
+      if (conds && conds->type() == Item::COND_ITEM &&
+          ((Item_cond*) conds)->functype() == Item_func::COND_AND_FUNC)
+        *cond_equal= &((Item_cond_and*) conds)->m_cond_equal;
+      step_wrapper.add("resulting_condition", conds);
+      DBUG_EXECUTE("info",print_where(conds,"after remove", QT_ORDINARY););
+    }
   }
   DBUG_RETURN(conds);
 }
@@ -21783,6 +21854,7 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
   bool orig_cond_saved= false;
   int best_key= -1;
   bool changed_key= false;
+  Opt_trace_ctx *trace = &tab->join->thd->opt_trace;
   DBUG_ENTER("test_if_skip_sort_order");
 
   /* Check that we are always called with first non-const table */
@@ -21930,6 +22002,10 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
           save_cond= select->cond;
           if (select->pre_idx_push_select_cond)
             select->cond= select->pre_idx_push_select_cond;
+          Opt_trace_object trace_recest(trace, "rows_estimation");
+          trace_recest.add("table", table->pos_in_table_list)
+                      .add("index", table->key_info[best_key].name);
+
           res= select->test_quick_select(tab->join->thd, new_ref_key_map, 0,
                                          (tab->join->select_options &
                                           OPTION_FOUND_ROWS) ?
@@ -22016,6 +22092,9 @@ test_if_skip_sort_order(JOIN_TAB *tab,ORDER *order,ha_rows select_limit,
       key_map tmp_map;
       tmp_map.clear_all();       // Force the creation of quick select
       tmp_map.set_bit(best_key); // only best_key.
+      Opt_trace_object trace_recest(trace, "rows_estimation");
+      trace_recest.add("table", table->pos_in_table_list)
+                  .add("index", table->key_info[best_key].name);
       select->quick= 0;
       select->test_quick_select(join->thd, tmp_map, 0,
                                 join->select_options & OPTION_FOUND_ROWS ?

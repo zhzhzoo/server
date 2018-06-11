@@ -2412,6 +2412,11 @@ static Sys_var_ulong Sys_optimizer_selectivity_sampling_limit(
        VALID_RANGE(SELECTIVITY_SAMPLING_THRESHOLD, UINT_MAX),
        DEFAULT(SELECTIVITY_SAMPLING_LIMIT), BLOCK_SIZE(1));
 
+static Sys_var_bit Sys_optimizer_trace_enabled(
+       "optimizer_trace_enabled", "Enable the optimizer trace",
+       SESSION_VAR(optimizer_trace), CMD_LINE(REQUIRED_ARG),
+       OPTIMIZER_TRACE_ENABLED, DEFAULT(TRUE));
+
 static Sys_var_ulong Sys_optimizer_use_condition_selectivity(
        "optimizer_use_condition_selectivity",
        "Controls selectivity of which conditions the optimizer takes into "

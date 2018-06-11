@@ -101,6 +101,7 @@
 #include "sql_bootstrap.h"
 #include "sql_sequence.h"
 
+#include "opt_trace.h"
 #include "my_json_writer.h" 
 
 #define FLAGSTR(V,F) ((V)&(F)?#F" ":"")
@@ -3414,8 +3415,11 @@ mysql_execute_command(THD *thd)
   } /* endif unlikely slave */
 #endif
 
-  Opt_trace_start ots(&thd->opt_trace, thd->query(), thd->query_length(),
+  Opt_trace_ctx *trace = &thd->opt_trace;
+  Opt_trace_start ots(thd, &thd->opt_trace, thd->query(), thd->query_length(),
                       thd->variables.character_set_client);
+  Opt_trace_object wrapper(trace);
+  Opt_trace_array steps(trace, "steps");
 
 #ifdef WITH_WSREP
   if  (wsrep && WSREP(thd))
