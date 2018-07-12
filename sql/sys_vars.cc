@@ -2412,10 +2412,58 @@ static Sys_var_ulong Sys_optimizer_selectivity_sampling_limit(
        VALID_RANGE(SELECTIVITY_SAMPLING_THRESHOLD, UINT_MAX),
        DEFAULT(SELECTIVITY_SAMPLING_LIMIT), BLOCK_SIZE(1));
 
-static Sys_var_bit Sys_optimizer_trace_enabled(
-       "optimizer_trace_enabled", "Enable the optimizer trace",
+static Sys_var_mybool Sys_var_end_markers_in_json(
+       "end_markers_in_json",
+       "In JSON output (\"EXPLAIN FORMAT=JSON\" and optimizer trace), "
+       "if variable is set to 1, repeats the structure's key (if it has one) "
+       "near the closing bracket",
+       SESSION_VAR(end_markers_in_json), CMD_LINE(OPT_ARG),
+       DEFAULT(false));
+
+static Sys_var_flagset Sys_optimizer_trace(
+       "optimizer_trace",
+       "Controls tracing of the Optimizer:"
+       " optimizer_trace=option=val[,option=val...], where option is one of"
+       " {enabled, one_line}"
+       " and val is one of {on, default}",
        SESSION_VAR(optimizer_trace), CMD_LINE(REQUIRED_ARG),
-       OPTIMIZER_TRACE_ENABLED, DEFAULT(TRUE));
+       Opt_trace_ctx::flag_names,  DEFAULT(Opt_trace_ctx::FLAG_DEFAULT));
+
+static Sys_var_flagset Sys_optimizer_trace_features(
+       "optimizer_trace_features",
+       "Enables/disables tracing of selected features of the Optimizer:"
+       " optimizer_trace_features=option=val[,option=val...], where option is one "
+       "of"
+       " {greedy_search, range_optimizer, dynamic_range, repeated_subselect}"
+       " and val is one of {on, off, default}",
+       SESSION_VAR(optimizer_trace_features), CMD_LINE(REQUIRED_ARG),
+       Opt_trace_ctx::feature_names,
+       DEFAULT(Opt_trace_ctx::default_features));
+
+/** Delete all old optimizer traces */
+static bool optimizer_trace_update(sys_var *, THD *thd, enum_var_type) {
+  thd->opt_trace.reset();
+  return false;
+}
+
+static Sys_var_long Sys_optimizer_trace_offset(
+       "optimizer_trace_offset",
+       "Offset of first optimizer trace to show; see manual",
+       SESSION_VAR(optimizer_trace_offset), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(LONG_MIN, LONG_MAX), DEFAULT(-1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(optimizer_trace_update));
+
+static Sys_var_long Sys_optimizer_trace_limit(
+       "optimizer_trace_limit", "Maximum number of shown optimizer traces",
+       SESSION_VAR(optimizer_trace_limit), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(0, LONG_MAX), DEFAULT(1), BLOCK_SIZE(1), NO_MUTEX_GUARD,
+       NOT_IN_BINLOG, ON_CHECK(NULL), ON_UPDATE(optimizer_trace_update));
+
+static Sys_var_ulong Sys_optimizer_trace_max_mem_size(
+       "optimizer_trace_max_mem_size",
+       "Maximum allowed cumulated size of stored optimizer traces",
+       SESSION_VAR(optimizer_trace_max_mem_size), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(0, ULONG_MAX), DEFAULT(1024 * 1024), BLOCK_SIZE(1));
 
 static Sys_var_ulong Sys_optimizer_use_condition_selectivity(
        "optimizer_use_condition_selectivity",

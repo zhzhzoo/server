@@ -603,8 +603,13 @@ typedef struct system_variables
   ulong optimizer_prune_level;
   ulong optimizer_search_depth;
   ulong optimizer_selectivity_sampling_limit;
-  ulong optimizer_trace;
+  my_bool end_markers_in_json;
+  ulong optimizer_trace;           ///< bitmap to tune optimizer tracing
+  ulong optimizer_trace_features;  ///< bitmap to select features to trace
   ulong optimizer_use_condition_selectivity;
+  long optimizer_trace_offset;
+  long optimizer_trace_limit;
+  ulong optimizer_trace_max_mem_size;
   ulong use_stat_tables;
   ulong histogram_size;
   ulong histogram_type;

@@ -78,7 +78,7 @@ public:
   }
 
   /** Sort me... */
-  void sort_buffer(const Sort_param *param, uint count);
+  void sort_buffer(Sort_param *param, uint count);
 
   /// Initializes a record pointer.
   uchar *get_record_buffer(uint idx)

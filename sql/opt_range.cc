@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates.
+/* Copyright (c) 2000, 2015, Oract_quick_selecte and/or its affiliates.
    Copyright (c) 2008, 2015, MariaDB
 
    This program is free software; you can redistribute it and/or modify
@@ -2092,7 +2092,6 @@ class TRP_ROR_INTERSECT;
 class TRP_ROR_UNION;
 class TRP_INDEX_MERGE;
 
-
 /*
   Plan for a QUICK_RANGE_SELECT scan.
   TRP_RANGE::make_quick ignores retrieve_full_rows parameter because
@@ -2128,9 +2127,7 @@ public:
   }
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
 
 
@@ -2152,11 +2149,8 @@ public:
   double index_scan_costs; /* SUM(cost(index_scan)) */
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
-
 
 /*
   Plan for QUICK_ROR_UNION_SELECT scan.
@@ -2175,11 +2169,8 @@ public:
   TABLE_READ_PLAN **last_ror;  /* end of the above array */
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
-
 
 /*
   Plan for QUICK_INDEX_INTERSECT_SELECT scan.
@@ -2200,11 +2191,8 @@ public:
   key_map filtered_scans;  
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
-
 
 /*
   Plan for QUICK_INDEX_MERGE_SELECT scan.
@@ -2223,11 +2211,8 @@ public:
   TRP_RANGE **range_scans_end; /* end of the array */
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
-
 
 /*
   Plan for a QUICK_GROUP_MIN_MAX_SELECT scan. 
@@ -2281,11 +2266,8 @@ public:
   void use_index_scan() { is_index_scan= TRUE; }
 
   virtual void trace_basic_info(const PARAM *param,
-                                Opt_trace_object *trace_object) const
-  {
-  }
+                                Opt_trace_object *trace_object) const;
 };
-
 
 typedef struct st_index_scan_info
 {
@@ -2463,7 +2445,7 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
   DBUG_PRINT("info",("Time to scan table: %g", read_time));
 
   Opt_trace_ctx *trace = &thd->opt_trace;
-  Opt_trace_object trace_wrapper(trace, "range_analysis");
+  Opt_trace_object trace_range_analysis(trace, "range_analysis");
   Opt_trace_object(trace, "table_scan").add("rows", (ulong) head->stat_records())
                                        .add("cost", read_time);
 
@@ -2609,7 +2591,7 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
       {
         if (tree->type == SEL_TREE::IMPOSSIBLE)
         {
-          trace_wrapper.add("impossible_range", true);
+          trace_range_analysis.add("impossible_range", true);
           records=0L;                      /* Return -1 from this function. */
           read_time= (double) HA_POS_ERROR;
           goto free_mem;
@@ -2620,9 +2602,9 @@ int SQL_SELECT::test_quick_select(THD *thd, key_map keys_to_use,
         */
         if (tree->type != SEL_TREE::KEY && tree->type != SEL_TREE::KEY_SMALLER)
         {
-          trace_wrapper.add("range_scan_possible", false);
+          trace_range_analysis.add("range_scan_possible", false);
           if (tree->type == SEL_TREE::ALWAYS)
-            trace_wrapper.add("cause", "condition_always_true");
+            trace_range_analysis.add("cause", "condition_always_true");
           tree= NULL;
         }
       }
@@ -4732,6 +4714,9 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
   DBUG_ENTER("get_best_disjunct_quick");
   DBUG_PRINT("info", ("Full table scan cost: %g", read_time));
 
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  Opt_trace_object trace_best_disjunct(trace);
+
   /*
     In every tree of imerge remove SEL_ARG trees that do not make ranges.
     If after this removal some SEL_ARG tree becomes empty discard imerge.  
@@ -4759,38 +4744,49 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
     analyze possibility of ROR scans. Also calculate some values needed by
     other parts of the code.
   */
-  for (ptree= imerge->trees, cur_child= range_scans;
-       ptree != imerge->trees_next;
-       ptree++, cur_child++)
   {
-    DBUG_EXECUTE("info", print_sel_tree(param, *ptree, &(*ptree)->keys_map,
-                                        "tree in SEL_IMERGE"););
-    if (!(*cur_child= get_key_scans_params(param, *ptree, TRUE, FALSE, read_time)))
+    Opt_trace_array to_merge(trace, "indexes_to_merge");
+    for (ptree= imerge->trees, cur_child= range_scans;
+         ptree != imerge->trees_next;
+         ptree++, cur_child++)
     {
-      /*
-        One of index scans in this index_merge is more expensive than entire
-        table read for another available option. The entire index_merge (and
-        any possible ROR-union) will be more expensive then, too. We continue
-        here only to update SQL_SELECT members.
-      */
-      imerge_too_expensive= TRUE;
-    }
-    if (imerge_too_expensive)
-      continue;
+      DBUG_EXECUTE("info", print_sel_tree(param, *ptree, &(*ptree)->keys_map,
+                                          "tree in SEL_IMERGE"););
+      Opt_trace_object trace_idx(trace);
+      if (!(*cur_child= get_key_scans_params(param, *ptree, TRUE, FALSE, read_time)))
+      {
+        /*
+          One of index scans in this index_merge is more expensive than entire
+          table read for another available option. The entire index_merge (and
+          any possible ROR-union) will be more expensive then, too. We continue
+          here only to update SQL_SELECT members.
+        */
+        imerge_too_expensive= TRUE;
+      }
+      if (imerge_too_expensive)
+      {
+        trace_idx.add("chosen", false).add("cause", "cost");
+        continue;
+      }
+  
+      const uint keynr_in_table = param->real_keynr[(*cur_child)->key_idx];
+      imerge_cost += (*cur_child)->read_cost;
+      all_scans_ror_able &= ((*ptree)->n_ror_scans > 0);
+      all_scans_rors &= (*cur_child)->is_ror;
+      if (pk_is_clustered && keynr_in_table == param->table->s->primary_key)
+      {
+        cpk_scan= cur_child;
+        cpk_scan_records= (*cur_child)->records;
+      }
+      else
+        non_cpk_scan_records += (*cur_child)->records;
 
-    imerge_cost += (*cur_child)->read_cost;
-    all_scans_ror_able &= ((*ptree)->n_ror_scans > 0);
-    all_scans_rors &= (*cur_child)->is_ror;
-    if (pk_is_clustered &&
-        param->real_keynr[(*cur_child)->key_idx] ==
-        param->table->s->primary_key)
-    {
-      cpk_scan= cur_child;
-      cpk_scan_records= (*cur_child)->records;
+      trace_idx
+        .add("index_to_merge", param->table->key_info[keynr_in_table].name)
+        .add("cumulated_cost", imerge_cost);
     }
-    else
-      non_cpk_scan_records += (*cur_child)->records;
   }
+  trace_best_disjunct.add("cost_of_reading_ranges", imerge_cost);
 
   DBUG_PRINT("info", ("index_merge scans cost %g", imerge_cost));
   if (imerge_too_expensive || (imerge_cost > read_time) ||
@@ -4804,6 +4800,7 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
     */
     DBUG_PRINT("info", ("Sum of index_merge scans is more expensive than "
                         "full table scan, bailing out"));
+    trace_best_disjunct.add("chosen", false).add("cause", "cost");
     DBUG_RETURN(NULL);
   }
 
@@ -4816,6 +4813,8 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
       optimizer_flag(param->thd, OPTIMIZER_SWITCH_INDEX_MERGE_UNION))
   {
     roru_read_plans= (TABLE_READ_PLAN**)range_scans;
+    trace_best_disjunct.add("use_roworder_union", true)
+      .add("cause", "always_cheaper_than_not_roworder_retrieval");
     goto skip_to_ror_scan;
   }
 
@@ -4825,16 +4824,25 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
       Add one ROWID comparison for each row retrieved on non-CPK scan.  (it
       is done in QUICK_RANGE_SELECT::row_in_ranges)
      */
-    imerge_cost += non_cpk_scan_records / TIME_FOR_COMPARE_ROWID;
+    const double rid_comp_cost = non_cpk_scan_records / TIME_FOR_COMPARE_ROWID;
+    imerge_cost += rid_comp_cost;
+    trace_best_disjunct.add("cost_of_mapping_rowid_in_non_clustered_pk_scan",
+                            rid_comp_cost);
   }
 
   /* Calculate cost(rowid_to_row_scan) */
-  imerge_cost += get_sweep_read_cost(param, non_cpk_scan_records);
+  {
+    double sweep_read_cost = get_sweep_read_cost(param, non_cpk_scan_records);
+    imerge_cost += sweep_read_cost;
+    trace_best_disjunct.add("cost_sort_rowid_and_read_disk", sweep_read_cost);
+  }
   DBUG_PRINT("info",("index_merge cost with rowid-to-row scan: %g",
                      imerge_cost));
   if (imerge_cost > read_time || 
       !optimizer_flag(param->thd, OPTIMIZER_SWITCH_INDEX_MERGE_SORT_UNION))
   {
+    trace_best_disjunct.add("use_roworder_index_merge", true)
+                       .add("cause", "cost");
     goto build_ror_index_merge;
   }
 
@@ -4851,12 +4859,18 @@ TABLE_READ_PLAN *get_best_disjunct_quick(PARAM *param, SEL_IMERGE *imerge,
     param->imerge_cost_buff_size= unique_calc_buff_size;
   }
 
-  imerge_cost +=
-    Unique::get_use_cost(param->imerge_cost_buff, (uint)non_cpk_scan_records,
-                         param->table->file->ref_length,
-                         (size_t)param->thd->variables.sortbuff_size,
-                         TIME_FOR_COMPARE_ROWID,
-                         FALSE, NULL);
+  {
+    const double dup_removal_cost = 
+      Unique::get_use_cost(param->imerge_cost_buff, (uint)non_cpk_scan_records,
+                           param->table->file->ref_length,
+                           (size_t)param->thd->variables.sortbuff_size,
+                           TIME_FOR_COMPARE_ROWID,
+                           FALSE, NULL);
+    trace_best_disjunct.add("cost_duplicate_removal", dup_removal_cost);
+    imerge_cost += dup_removal_cost;
+  }
+
+  trace_best_disjunct.add("total_cost", imerge_cost);
   DBUG_PRINT("info",("index_merge total cost: %g (wanted: less then %g)",
                      imerge_cost, read_time));
   if (imerge_cost < read_time)
@@ -4899,45 +4913,50 @@ skip_to_ror_scan:
   roru_total_records= 0;
   cur_roru_plan= roru_read_plans;
 
-  /* Find 'best' ROR scan for each of trees in disjunction */
-  for (ptree= imerge->trees, cur_child= range_scans;
-       ptree != imerge->trees_next;
-       ptree++, cur_child++, cur_roru_plan++)
   {
-    /*
-      Assume the best ROR scan is the one that has cheapest full-row-retrieval
-      scan cost.
-      Also accumulate index_only scan costs as we'll need them to calculate
-      overall index_intersection cost.
-    */
-    double cost;
-    if ((*cur_child)->is_ror)
+    Opt_trace_array trace_analyze_ror(trace, "analyzing_roworder_scans");
+    /* Find 'best' ROR scan for each of trees in disjunction */
+    for (ptree= imerge->trees, cur_child= range_scans;
+         ptree != imerge->trees_next;
+         ptree++, cur_child++, cur_roru_plan++)
     {
-      /* Ok, we have index_only cost, now get full rows scan cost */
-      cost= param->table->file->
-              read_time(param->real_keynr[(*cur_child)->key_idx], 1,
-                        (*cur_child)->records) +
-              rows2double((*cur_child)->records) / TIME_FOR_COMPARE;
-    }
-    else
-      cost= read_time;
-
-    TABLE_READ_PLAN *prev_plan= *cur_child;
-    if (!(*cur_roru_plan= get_best_ror_intersect(param, *ptree, cost,
-                                                 &dummy)))
-    {
-      if (prev_plan->is_ror)
-        *cur_roru_plan= prev_plan;
+      Opt_trace_object trp_info(trace);
+      (*cur_child)->trace_basic_info(param, &trp_info);
+      /*
+        Assume the best ROR scan is the one that has cheapest full-row-retrieval
+        scan cost.
+        Also accumulate index_only scan costs as we'll need them to calculate
+        overall index_intersection cost.
+      */
+      double cost;
+      if ((*cur_child)->is_ror)
+      {
+        /* Ok, we have index_only cost, now get full rows scan cost */
+        cost= param->table->file->
+                read_time(param->real_keynr[(*cur_child)->key_idx], 1,
+                          (*cur_child)->records) +
+                rows2double((*cur_child)->records) / TIME_FOR_COMPARE;
+      }
       else
-        DBUG_RETURN(imerge_trp);
-      roru_index_costs += (*cur_roru_plan)->read_cost;
+        cost= read_time;
+  
+      TABLE_READ_PLAN *prev_plan= *cur_child;
+      if (!(*cur_roru_plan= get_best_ror_intersect(param, *ptree, cost,
+                                                   &dummy)))
+      {
+        if (prev_plan->is_ror)
+          *cur_roru_plan= prev_plan;
+        else
+          DBUG_RETURN(imerge_trp);
+        roru_index_costs += (*cur_roru_plan)->read_cost;
+      }
+      else
+        roru_index_costs +=
+          ((TRP_ROR_INTERSECT*)(*cur_roru_plan))->index_scan_costs;
+      roru_total_records += (*cur_roru_plan)->records;
+      roru_intersect_part *= (*cur_roru_plan)->records /
+                             param->table->stat_records();
     }
-    else
-      roru_index_costs +=
-        ((TRP_ROR_INTERSECT*)(*cur_roru_plan))->index_scan_costs;
-    roru_total_records += (*cur_roru_plan)->records;
-    roru_intersect_part *= (*cur_roru_plan)->records /
-                           param->table->stat_records();
   }
 
   /*
@@ -4963,6 +4982,8 @@ skip_to_ror_scan:
                    (TIME_FOR_COMPARE_ROWID * M_LN2) +
                    get_sweep_read_cost(param, roru_total_records);
 
+  trace_best_disjunct.add("index_roworder_union_cost", roru_total_cost)
+                     .add("members", n_child_scans);
   DBUG_PRINT("info", ("ROR-union: cost %g, %zu members",
                       roru_total_cost, n_child_scans));
   TRP_ROR_UNION* roru;
@@ -4970,6 +4991,7 @@ skip_to_ror_scan:
   {
     if ((roru= new (param->mem_root) TRP_ROR_UNION))
     {
+      trace_best_disjunct.add("chosen", true);
       roru->first_ror= roru_read_plans;
       roru->last_ror= roru_read_plans + n_child_scans;
       roru->read_cost= roru_total_cost;
@@ -4977,7 +4999,9 @@ skip_to_ror_scan:
       DBUG_RETURN(roru);
     }
   }
-    DBUG_RETURN(imerge_trp);
+  trace_best_disjunct.add("chosen", false);
+
+  DBUG_RETURN(imerge_trp);
 }
 
 
@@ -6887,6 +6911,7 @@ static TRP_RANGE *get_key_scans_params(PARAM *param, SEL_TREE *tree,
   DBUG_EXECUTE("info", print_sel_tree(param, tree, &tree->keys_map,
                                       "tree scans"););
   Opt_trace_ctx *trace = &param->thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
   Opt_trace_array ota(trace, "range_scan_alternatives");
 
   tree->ror_scans_map.clear_all();
@@ -12668,384 +12693,386 @@ get_best_group_min_max(PARAM *param, SEL_TREE *tree, double read_time)
   uint max_key_part;  
   SEL_ARG *cur_index_tree= NULL;
   ha_rows cur_quick_prefix_records= 0;
-  Opt_trace_array trace_indexes(trace, "potential_group_range_indexes");
 
-  // We go through allowed indexes
-  for (uint cur_param_idx= 0; cur_param_idx < param->keys ; ++cur_param_idx)
   {
-    const uint cur_index= param->real_keynr[cur_param_idx];
-    KEY *const cur_index_info= &table->key_info[cur_index];
-    KEY_PART_INFO *cur_part;
-    KEY_PART_INFO *end_part; /* Last part for loops. */
-    /* Last index part. */
-    KEY_PART_INFO *last_part;
-    KEY_PART_INFO *first_non_group_part;
-    KEY_PART_INFO *first_non_infix_part;
-    uint key_parts;
-    uint key_infix_parts;
-    uint cur_group_key_parts= 0;
-    uint cur_group_prefix_len= 0;
-    double cur_read_cost;
-    ha_rows cur_records;
-    key_map used_key_parts_map;
-    uint cur_key_infix_len= 0;
-    uchar cur_key_infix[MAX_KEY_LENGTH];
-    uint cur_used_key_parts;
-    Opt_trace_object trace_idx(trace);
-    const char *cause = NULL;
-    trace_idx.add("index", cur_index_info->name);
-    
-    /*
-      Check (B1) - if current index is covering.
-      (was also: "Exclude UNIQUE indexes ..." but this was removed because 
-      there are cases Loose Scan over a multi-part index is useful).
-    */
-    if (!table->covering_keys.is_set(cur_index) ||
-        !table->keys_in_use_for_group_by.is_set(cur_index))
+    Opt_trace_array trace_indexes(trace, "potential_group_range_indexes");
+    // We go through allowed indexes
+    for (uint cur_param_idx= 0; cur_param_idx < param->keys ; ++cur_param_idx)
     {
-      cause = "not_covering";
-      goto next_index;
-    }
-    
-    /*
-      This function is called on the precondition that the index is covering.
-      Therefore if the GROUP BY list contains more elements than the index,
-      these are duplicates. The GROUP BY list cannot be a prefix of the index.
-    */
-    if (elements_in_group > table->actual_n_key_parts(cur_index_info))
-    {
-      cause = "not_covering";
-      goto next_index;
-    }
-    
-    /*
-      Unless extended keys can be used for cur_index:
-      If the current storage manager is such that it appends the primary key to
-      each index, then the above condition is insufficient to check if the
-      index is covering. In such cases it may happen that some fields are
-      covered by the PK index, but not by the current index. Since we can't
-      use the concatenation of both indexes for index lookup, such an index
-      does not qualify as covering in our case. If this is the case, below
-      we check that all query fields are indeed covered by 'cur_index'.
-    */
-    if (cur_index_info->user_defined_key_parts == table->actual_n_key_parts(cur_index_info)
-        && pk < MAX_KEY && cur_index != pk &&
-        (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX))
-    {
-      /* For each table field */
-      for (uint i= 0; i < table->s->fields; i++)
+      const uint cur_index= param->real_keynr[cur_param_idx];
+      KEY *const cur_index_info= &table->key_info[cur_index];
+      KEY_PART_INFO *cur_part;
+      KEY_PART_INFO *end_part; /* Last part for loops. */
+      /* Last index part. */
+      KEY_PART_INFO *last_part;
+      KEY_PART_INFO *first_non_group_part;
+      KEY_PART_INFO *first_non_infix_part;
+      uint key_parts;
+      uint key_infix_parts;
+      uint cur_group_key_parts= 0;
+      uint cur_group_prefix_len= 0;
+      double cur_read_cost;
+      ha_rows cur_records;
+      key_map used_key_parts_map;
+      uint cur_key_infix_len= 0;
+      uchar cur_key_infix[MAX_KEY_LENGTH];
+      uint cur_used_key_parts;
+      Opt_trace_object trace_idx(trace);
+      const char *cause = NULL;
+      trace_idx.add("index", cur_index_info->name);
+      
+      /*
+        Check (B1) - if current index is covering.
+        (was also: "Exclude UNIQUE indexes ..." but this was removed because 
+        there are cases Loose Scan over a multi-part index is useful).
+      */
+      if (!table->covering_keys.is_set(cur_index) ||
+          !table->keys_in_use_for_group_by.is_set(cur_index))
       {
-        Field *cur_field= table->field[i];
-        /*
-          If the field is used in the current query ensure that it's
-          part of 'cur_index'
-        */
-        if (bitmap_is_set(table->read_set, cur_field->field_index) &&
-            !cur_field->part_of_key_not_clustered.is_set(cur_index))
+        cause = "not_covering";
+        goto next_index;
+      }
+      
+      /*
+        This function is called on the precondition that the index is covering.
+        Therefore if the GROUP BY list contains more elements than the index,
+        these are duplicates. The GROUP BY list cannot be a prefix of the index.
+      */
+      if (elements_in_group > table->actual_n_key_parts(cur_index_info))
+      {
+        cause = "not_covering";
+        goto next_index;
+      }
+      
+      /*
+        Unless extended keys can be used for cur_index:
+        If the current storage manager is such that it appends the primary key to
+        each index, then the above condition is insufficient to check if the
+        index is covering. In such cases it may happen that some fields are
+        covered by the PK index, but not by the current index. Since we can't
+        use the concatenation of both indexes for index lookup, such an index
+        does not qualify as covering in our case. If this is the case, below
+        we check that all query fields are indeed covered by 'cur_index'.
+      */
+      if (cur_index_info->user_defined_key_parts == table->actual_n_key_parts(cur_index_info)
+          && pk < MAX_KEY && cur_index != pk &&
+          (table->file->ha_table_flags() & HA_PRIMARY_KEY_IN_READ_INDEX))
+      {
+        /* For each table field */
+        for (uint i= 0; i < table->s->fields; i++)
         {
-          cause = "not_covering";
-          goto next_index;                  // Field was not part of key
+          Field *cur_field= table->field[i];
+          /*
+            If the field is used in the current query ensure that it's
+            part of 'cur_index'
+          */
+          if (bitmap_is_set(table->read_set, cur_field->field_index) &&
+              !cur_field->part_of_key_not_clustered.is_set(cur_index))
+          {
+            cause = "not_covering";
+            goto next_index;                  // Field was not part of key
+          }
         }
       }
-    }
-    trace_idx.add("covering", true);
-
-    max_key_part= 0;
-    used_key_parts_map.clear_all();
-
-    /*
-      Check (GA1) for GROUP BY queries.
-    */
-    if (join->group_list)
-    {
-      cur_part= cur_index_info->key_part;
-      end_part= cur_part + table->actual_n_key_parts(cur_index_info);
-      /* Iterate in parallel over the GROUP list and the index parts. */
-      for (tmp_group= join->group_list; tmp_group && (cur_part != end_part);
-           tmp_group= tmp_group->next, cur_part++)
+      trace_idx.add("covering", true);
+  
+      max_key_part= 0;
+      used_key_parts_map.clear_all();
+  
+      /*
+        Check (GA1) for GROUP BY queries.
+      */
+      if (join->group_list)
       {
-        /*
-          TODO:
-          tmp_group::item is an array of Item, is it OK to consider only the
-          first Item? If so, then why? What is the array for?
-        */
-        /* Above we already checked that all group items are fields. */
-        DBUG_ASSERT((*tmp_group->item)->real_item()->type() == Item::FIELD_ITEM);
-        Item_field *group_field= (Item_field *) (*tmp_group->item)->real_item();
-        if (group_field->field->eq(cur_part->field))
+        cur_part= cur_index_info->key_part;
+        end_part= cur_part + table->actual_n_key_parts(cur_index_info);
+        /* Iterate in parallel over the GROUP list and the index parts. */
+        for (tmp_group= join->group_list; tmp_group && (cur_part != end_part);
+             tmp_group= tmp_group->next, cur_part++)
         {
+          /*
+            TODO:
+            tmp_group::item is an array of Item, is it OK to consider only the
+            first Item? If so, then why? What is the array for?
+          */
+          /* Above we already checked that all group items are fields. */
+          DBUG_ASSERT((*tmp_group->item)->real_item()->type() == Item::FIELD_ITEM);
+          Item_field *group_field= (Item_field *) (*tmp_group->item)->real_item();
+          if (group_field->field->eq(cur_part->field))
+          {
+            cur_group_prefix_len+= cur_part->store_length;
+            ++cur_group_key_parts;
+            max_key_part= (uint)(cur_part - cur_index_info->key_part) + 1;
+            used_key_parts_map.set_bit(max_key_part);
+          }
+          else
+          {
+            cause = "group_attribute_not_prefix_in_index";
+            goto next_index;
+          }
+        }
+      }
+      /*
+        Check (GA2) if this is a DISTINCT query.
+        If GA2, then Store a new ORDER object in group_fields_array at the
+        position of the key part of item_field->field. Thus we get the ORDER
+        objects for each field ordered as the corresponding key parts.
+        Later group_fields_array of ORDER objects is used to convert the query
+        to a GROUP query.
+      */
+      if ((!join->group && join->select_distinct) ||
+          is_agg_distinct)
+      {
+        if (!is_agg_distinct)
+        {
+          select_items_it.rewind();
+        }
+  
+        List_iterator<Item_field> agg_distinct_flds_it (agg_distinct_flds);
+        while (NULL != (item = (is_agg_distinct ?
+               (Item *) agg_distinct_flds_it++ : select_items_it++)))
+        {
+          /* (SA5) already checked above. */
+          item_field= (Item_field*) item->real_item(); 
+          DBUG_ASSERT(item->real_item()->type() == Item::FIELD_ITEM);
+  
+          /* not doing loose index scan for derived tables */
+          if (!item_field->field)
+          {
+            cause = "derived_table";
+            goto next_index;
+          }
+  
+          /* Find the order of the key part in the index. */
+          key_part_nr= get_field_keypart(cur_index_info, item_field->field);
+          /*
+            Check if this attribute was already present in the select list.
+            If it was present, then its corresponding key part was alredy used.
+          */
+          if (used_key_parts_map.is_set(key_part_nr))
+            continue;
+          if (key_part_nr < 1 ||
+              (!is_agg_distinct && key_part_nr > join->fields_list.elements))
+          {
+            cause = "select_attribute_not_prefix_in_index";
+            goto next_index;
+          }
+          cur_part= cur_index_info->key_part + key_part_nr - 1;
           cur_group_prefix_len+= cur_part->store_length;
+          used_key_parts_map.set_bit(key_part_nr);
           ++cur_group_key_parts;
-          max_key_part= (uint)(cur_part - cur_index_info->key_part) + 1;
-          used_key_parts_map.set_bit(max_key_part);
+          max_key_part= MY_MAX(max_key_part,key_part_nr);
         }
-        else
-        {
-          cause = "group_attribute_not_prefix_in_index";
-          goto next_index;
-        }
-      }
-    }
-    /*
-      Check (GA2) if this is a DISTINCT query.
-      If GA2, then Store a new ORDER object in group_fields_array at the
-      position of the key part of item_field->field. Thus we get the ORDER
-      objects for each field ordered as the corresponding key parts.
-      Later group_fields_array of ORDER objects is used to convert the query
-      to a GROUP query.
-    */
-    if ((!join->group && join->select_distinct) ||
-        is_agg_distinct)
-    {
-      if (!is_agg_distinct)
-      {
-        select_items_it.rewind();
-      }
-
-      List_iterator<Item_field> agg_distinct_flds_it (agg_distinct_flds);
-      while (NULL != (item = (is_agg_distinct ?
-             (Item *) agg_distinct_flds_it++ : select_items_it++)))
-      {
-        /* (SA5) already checked above. */
-        item_field= (Item_field*) item->real_item(); 
-        DBUG_ASSERT(item->real_item()->type() == Item::FIELD_ITEM);
-
-        /* not doing loose index scan for derived tables */
-        if (!item_field->field)
-        {
-          cause = "derived_table";
-          goto next_index;
-        }
-
-        /* Find the order of the key part in the index. */
-        key_part_nr= get_field_keypart(cur_index_info, item_field->field);
         /*
-          Check if this attribute was already present in the select list.
-          If it was present, then its corresponding key part was alredy used.
+          Check that used key parts forms a prefix of the index.
+          To check this we compare bits in all_parts and cur_parts.
+          all_parts have all bits set from 0 to (max_key_part-1).
+          cur_parts have bits set for only used keyparts.
         */
-        if (used_key_parts_map.is_set(key_part_nr))
-          continue;
-        if (key_part_nr < 1 ||
-            (!is_agg_distinct && key_part_nr > join->fields_list.elements))
+        ulonglong all_parts, cur_parts;
+        all_parts= (1ULL << max_key_part) - 1;
+        cur_parts= used_key_parts_map.to_ulonglong() >> 1;
+        if (all_parts != cur_parts)
         {
           cause = "select_attribute_not_prefix_in_index";
           goto next_index;
         }
-        cur_part= cur_index_info->key_part + key_part_nr - 1;
-        cur_group_prefix_len+= cur_part->store_length;
-        used_key_parts_map.set_bit(key_part_nr);
-        ++cur_group_key_parts;
-        max_key_part= MY_MAX(max_key_part,key_part_nr);
       }
+  
+      /* Check (SA2). */
+      if (min_max_arg_item)
+      {
+        key_part_nr= get_field_keypart(cur_index_info, min_max_arg_item->field);
+        if (key_part_nr <= cur_group_key_parts)
+        {
+          cause = "aggregate_column_not_suffix_in_idx";
+          goto next_index;
+        }
+        min_max_arg_part= cur_index_info->key_part + key_part_nr - 1;
+      }
+  
       /*
-        Check that used key parts forms a prefix of the index.
-        To check this we compare bits in all_parts and cur_parts.
-        all_parts have all bits set from 0 to (max_key_part-1).
-        cur_parts have bits set for only used keyparts.
+        Aplly a heuristic: there is no point to use loose index scan when we're
+        using the whole unique index.
       */
-      ulonglong all_parts, cur_parts;
-      all_parts= (1ULL << max_key_part) - 1;
-      cur_parts= used_key_parts_map.to_ulonglong() >> 1;
-      if (all_parts != cur_parts)
+      if (cur_index_info->flags & HA_NOSAME && 
+          cur_group_key_parts == cur_index_info->user_defined_key_parts)
       {
-        cause = "select_attribute_not_prefix_in_index";
+        cause = "no_point_to_use_loose_index_scan";
         goto next_index;
       }
-    }
-
-    /* Check (SA2). */
-    if (min_max_arg_item)
-    {
-      key_part_nr= get_field_keypart(cur_index_info, min_max_arg_item->field);
-      if (key_part_nr <= cur_group_key_parts)
+  
+      /*
+        Check (NGA1, NGA2) and extract a sequence of constants to be used as part
+        of all search keys.
+      */
+  
+      /*
+        If there is MIN/MAX, each keypart between the last group part and the
+        MIN/MAX part must participate in one equality with constants, and all
+        keyparts after the MIN/MAX part must not be referenced in the query.
+  
+        If there is no MIN/MAX, the keyparts after the last group part can be
+        referenced only in equalities with constants, and the referenced keyparts
+        must form a sequence without any gaps that starts immediately after the
+        last group keypart.
+      */
+      key_parts= table->actual_n_key_parts(cur_index_info);
+      last_part= cur_index_info->key_part + key_parts;
+      first_non_group_part= (cur_group_key_parts < key_parts) ?
+                            cur_index_info->key_part + cur_group_key_parts :
+                            NULL;
+      first_non_infix_part= min_max_arg_part ?
+                            (min_max_arg_part < last_part) ?
+                               min_max_arg_part :
+                               NULL :
+                             NULL;
+      if (first_non_group_part &&
+          (!min_max_arg_part || (min_max_arg_part - first_non_group_part > 0)))
       {
-        cause = "aggregate_column_not_suffix_in_idx";
-        goto next_index;
+        if (tree)
+        {
+          SEL_ARG *index_range_tree= tree->keys[cur_param_idx];
+          if (!get_constant_key_infix(cur_index_info, index_range_tree,
+                                      first_non_group_part, min_max_arg_part,
+                                      last_part, thd, cur_key_infix, 
+                                      &cur_key_infix_len,
+                                      &first_non_infix_part))
+          {
+            cause = "nonconst_equality_gap_attribute";
+            goto next_index;
+          }
+        }
+        else if (min_max_arg_part &&
+                 (min_max_arg_part - first_non_group_part > 0))
+        {
+          /*
+            There is a gap but no range tree, thus no predicates at all for the
+            non-group keyparts.
+          */
+          cause = "no_nongroup_keypart_predicate";
+          goto next_index;
+        }
+        else if (first_non_group_part && join->conds)
+        {
+          /*
+            If there is no MIN/MAX function in the query, but some index
+            key part is referenced in the WHERE clause, then this index
+            cannot be used because the WHERE condition over the keypart's
+            field cannot be 'pushed' to the index (because there is no
+            range 'tree'), and the WHERE clause must be evaluated before
+            GROUP BY/DISTINCT.
+          */
+          /*
+            Store the first and last keyparts that need to be analyzed
+            into one array that can be passed as parameter.
+          */
+          KEY_PART_INFO *key_part_range[2];
+          key_part_range[0]= first_non_group_part;
+          key_part_range[1]= last_part;
+  
+          /* Check if cur_part is referenced in the WHERE clause. */
+          if (join->conds->walk(&Item::find_item_in_field_list_processor, 0,
+                                key_part_range))
+          {
+            cause = "keypart_reference_from_where_clause";
+            goto next_index;
+          }
+        }
       }
-      min_max_arg_part= cur_index_info->key_part + key_part_nr - 1;
-    }
-
-    /*
-      Aplly a heuristic: there is no point to use loose index scan when we're
-      using the whole unique index.
-    */
-    if (cur_index_info->flags & HA_NOSAME && 
-        cur_group_key_parts == cur_index_info->user_defined_key_parts)
-    {
-      cause = "no_point_to_use_loose_index_scan";
-      goto next_index;
-    }
-
-    /*
-      Check (NGA1, NGA2) and extract a sequence of constants to be used as part
-      of all search keys.
-    */
-
-    /*
-      If there is MIN/MAX, each keypart between the last group part and the
-      MIN/MAX part must participate in one equality with constants, and all
-      keyparts after the MIN/MAX part must not be referenced in the query.
-
-      If there is no MIN/MAX, the keyparts after the last group part can be
-      referenced only in equalities with constants, and the referenced keyparts
-      must form a sequence without any gaps that starts immediately after the
-      last group keypart.
-    */
-    key_parts= table->actual_n_key_parts(cur_index_info);
-    last_part= cur_index_info->key_part + key_parts;
-    first_non_group_part= (cur_group_key_parts < key_parts) ?
-                          cur_index_info->key_part + cur_group_key_parts :
-                          NULL;
-    first_non_infix_part= min_max_arg_part ?
-                          (min_max_arg_part < last_part) ?
-                             min_max_arg_part :
-                             NULL :
-                           NULL;
-    if (first_non_group_part &&
-        (!min_max_arg_part || (min_max_arg_part - first_non_group_part > 0)))
-    {
-      if (tree)
+  
+      /*
+        Test (WA1) partially - that no other keypart after the last infix part is
+        referenced in the query.
+      */
+      if (first_non_infix_part)
+      {
+        cur_part= first_non_infix_part +
+                  (min_max_arg_part && (min_max_arg_part < last_part));
+        for (; cur_part != last_part; cur_part++)
+        {
+          if (bitmap_is_set(table->read_set, cur_part->field->field_index))
+          {
+            cause = "keypart_after_infix_in_query";
+            goto next_index;
+          }
+        }
+      }
+  
+      /**
+        Test WA2:If there are conditions on a column C participating in
+        MIN/MAX, those conditions must be conjunctions to all earlier
+        keyparts. Otherwise, Loose Index Scan cannot be used.
+      */
+      if (tree && min_max_arg_item)
       {
         SEL_ARG *index_range_tree= tree->keys[cur_param_idx];
-        if (!get_constant_key_infix(cur_index_info, index_range_tree,
-                                    first_non_group_part, min_max_arg_part,
-                                    last_part, thd, cur_key_infix, 
-                                    &cur_key_infix_len,
-                                    &first_non_infix_part))
+        SEL_ARG *cur_range= NULL;
+        if (get_sel_arg_for_keypart(min_max_arg_part->field,
+                                    index_range_tree, &cur_range) ||
+            (cur_range && cur_range->type != SEL_ARG::KEY_RANGE))
         {
-          cause = "nonconst_equality_gap_attribute";
+          cause = "minmax_keypart_in_disjunctive_query";
           goto next_index;
         }
       }
-      else if (min_max_arg_part &&
-               (min_max_arg_part - first_non_group_part > 0))
+  
+      /* If we got to this point, cur_index_info passes the test. */
+      key_infix_parts= cur_key_infix_len ? (uint) 
+                       (first_non_infix_part - first_non_group_part) : 0;
+      cur_used_key_parts= cur_group_key_parts + key_infix_parts;
+  
+      /* Compute the cost of using this index. */
+      if (tree)
       {
-        /*
-          There is a gap but no range tree, thus no predicates at all for the
-          non-group keyparts.
-        */
-        cause = "no_nongroup_keypart_predicate";
-        goto next_index;
-      }
-      else if (first_non_group_part && join->conds)
-      {
-        /*
-          If there is no MIN/MAX function in the query, but some index
-          key part is referenced in the WHERE clause, then this index
-          cannot be used because the WHERE condition over the keypart's
-          field cannot be 'pushed' to the index (because there is no
-          range 'tree'), and the WHERE clause must be evaluated before
-          GROUP BY/DISTINCT.
-        */
-        /*
-          Store the first and last keyparts that need to be analyzed
-          into one array that can be passed as parameter.
-        */
-        KEY_PART_INFO *key_part_range[2];
-        key_part_range[0]= first_non_group_part;
-        key_part_range[1]= last_part;
-
-        /* Check if cur_part is referenced in the WHERE clause. */
-        if (join->conds->walk(&Item::find_item_in_field_list_processor, 0,
-                              key_part_range))
-        {
-          cause = "keypart_reference_from_where_clause";
-          goto next_index;
+        cur_index_tree= tree->keys[cur_param_idx];
+        /* Check if this range tree can be used for prefix retrieval. */
+        Cost_estimate dummy_cost;
+        uint mrr_flags= HA_MRR_USE_DEFAULT_IMPL;
+        uint mrr_bufsize=0;
+        cur_quick_prefix_records= check_quick_select(param, cur_param_idx,
+                                                     FALSE /*don't care*/,
+                                                     cur_index_tree, TRUE,
+                                                     &mrr_flags, &mrr_bufsize,
+                                                     &dummy_cost);
+        if (cur_index_tree) {
+          const KEY_PART_INFO *key_part = cur_index_info->key_part;
+          Opt_trace_array trace_range(trace, "ranges");
+          print_range_all_keyparts(&trace_range,
+                                   cur_index_tree, key_part);
         }
       }
-    }
-
-    /*
-      Test (WA1) partially - that no other keypart after the last infix part is
-      referenced in the query.
-    */
-    if (first_non_infix_part)
-    {
-      cur_part= first_non_infix_part +
-                (min_max_arg_part && (min_max_arg_part < last_part));
-      for (; cur_part != last_part; cur_part++)
+      cost_group_min_max(table, cur_index_info, cur_used_key_parts,
+                         cur_group_key_parts, tree, cur_index_tree,
+                         cur_quick_prefix_records, have_min, have_max,
+                         &cur_read_cost, &cur_records);
+      /*
+        If cur_read_cost is lower than best_read_cost use cur_index.
+        Do not compare doubles directly because they may have different
+        representations (64 vs. 80 bits).
+      */
+      trace_idx.add("rows", cur_records).add("cost", cur_read_cost);
+      if (cur_read_cost < best_read_cost - (DBL_EPSILON * cur_read_cost))
       {
-        if (bitmap_is_set(table->read_set, cur_part->field->field_index))
-        {
-          cause = "keypart_after_infix_in_query";
-          goto next_index;
-        }
+        index_info= cur_index_info;
+        index= cur_index;
+        best_read_cost= cur_read_cost;
+        best_records= cur_records;
+        best_index_tree= cur_index_tree;
+        best_quick_prefix_records= cur_quick_prefix_records;
+        best_param_idx= cur_param_idx;
+        group_key_parts= cur_group_key_parts;
+        group_prefix_len= cur_group_prefix_len;
+        key_infix_len= cur_key_infix_len;
+        if (key_infix_len)
+          memcpy (key_infix, cur_key_infix, sizeof (key_infix));
+        used_key_parts= cur_used_key_parts;
       }
+  
+    next_index:
+      if (cause)
+        trace_idx.add("usable", false).add("cause", cause);
     }
-
-    /**
-      Test WA2:If there are conditions on a column C participating in
-      MIN/MAX, those conditions must be conjunctions to all earlier
-      keyparts. Otherwise, Loose Index Scan cannot be used.
-    */
-    if (tree && min_max_arg_item)
-    {
-      SEL_ARG *index_range_tree= tree->keys[cur_param_idx];
-      SEL_ARG *cur_range= NULL;
-      if (get_sel_arg_for_keypart(min_max_arg_part->field,
-                                  index_range_tree, &cur_range) ||
-          (cur_range && cur_range->type != SEL_ARG::KEY_RANGE))
-      {
-        cause = "minmax_keypart_in_disjunctive_query";
-        goto next_index;
-      }
-    }
-
-    /* If we got to this point, cur_index_info passes the test. */
-    key_infix_parts= cur_key_infix_len ? (uint) 
-                     (first_non_infix_part - first_non_group_part) : 0;
-    cur_used_key_parts= cur_group_key_parts + key_infix_parts;
-
-    /* Compute the cost of using this index. */
-    if (tree)
-    {
-      cur_index_tree= tree->keys[cur_param_idx];
-      /* Check if this range tree can be used for prefix retrieval. */
-      Cost_estimate dummy_cost;
-      uint mrr_flags= HA_MRR_USE_DEFAULT_IMPL;
-      uint mrr_bufsize=0;
-      cur_quick_prefix_records= check_quick_select(param, cur_param_idx,
-                                                   FALSE /*don't care*/,
-                                                   cur_index_tree, TRUE,
-                                                   &mrr_flags, &mrr_bufsize,
-                                                   &dummy_cost);
-      if (cur_index_tree) {
-        const KEY_PART_INFO *key_part = cur_index_info->key_part;
-        Opt_trace_array trace_range(trace, "ranges");
-        print_range_all_keyparts(&trace_range,
-                                 cur_index_tree, key_part);
-      }
-    }
-    cost_group_min_max(table, cur_index_info, cur_used_key_parts,
-                       cur_group_key_parts, tree, cur_index_tree,
-                       cur_quick_prefix_records, have_min, have_max,
-                       &cur_read_cost, &cur_records);
-    /*
-      If cur_read_cost is lower than best_read_cost use cur_index.
-      Do not compare doubles directly because they may have different
-      representations (64 vs. 80 bits).
-    */
-    trace_idx.add("rows", cur_records).add("cost", cur_read_cost);
-    if (cur_read_cost < best_read_cost - (DBL_EPSILON * cur_read_cost))
-    {
-      index_info= cur_index_info;
-      index= cur_index;
-      best_read_cost= cur_read_cost;
-      best_records= cur_records;
-      best_index_tree= cur_index_tree;
-      best_quick_prefix_records= cur_quick_prefix_records;
-      best_param_idx= cur_param_idx;
-      group_key_parts= cur_group_key_parts;
-      group_prefix_len= cur_group_prefix_len;
-      key_infix_len= cur_key_infix_len;
-      if (key_infix_len)
-        memcpy (key_infix, cur_key_infix, sizeof (key_infix));
-      used_key_parts= cur_used_key_parts;
-    }
-
-  next_index:
-    if (cause)
-      trace_idx.add("usable", false).add("cause", cause);
   }
   if (!index_info) /* No usable index found. */
     DBUG_RETURN(NULL);
@@ -13070,7 +13097,7 @@ get_best_group_min_max(PARAM *param, SEL_TREE *tree, double read_time)
       table->file->primary_key_is_clustered())
   {
     trace_group.add("usable", false)
-               .add(cause, "primary_key_is_clustered");
+               .add("cause", "primary_key_is_clustered");
     DBUG_RETURN(NULL);
   }
 
@@ -15275,7 +15302,7 @@ static void append_range_all_keyparts(Opt_trace_array *range_trace,
                                       String *range_so_far, SEL_ARG *keypart,
                                       const KEY_PART_INFO *key_parts)
 {
-  DBUG_ASSERT(keypart && keypart != null_element && range_trace);
+  DBUG_ASSERT(keypart && keypart != &null_element && range_trace);
 
   // Navigate to first interval in red-black tree
   SEL_ARG *keypart_range = keypart->first();
@@ -15355,3 +15382,133 @@ static void print_range_all_keyparts(Opt_trace_array *range_trace,
   range_so_far.set_charset(system_charset_info);
   append_range_all_keyparts(range_trace, &range_so_far, keypart, key_parts);
 }
+
+void TRP_ROR_INTERSECT::trace_basic_info(const PARAM *param,
+                                         Opt_trace_object *trace_object) const {
+  trace_object->add("type", "index_roworder_intersect")
+               .add("rows", records)
+               .add("cost", read_cost)
+               .add("covering", is_covering)
+               .add("clustered_pk_scan", cpk_scan != NULL);
+
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  Opt_trace_array ota(trace, "intersect_of");
+  for (struct st_ror_scan_info **cur_scan = first_scan; cur_scan != last_scan;
+       cur_scan++) {
+    const KEY &cur_key = param->table->key_info[(*cur_scan)->keynr];
+    const KEY_PART_INFO *key_part = cur_key.key_part;
+
+    Opt_trace_object trace_isect_idx(trace);
+    trace_isect_idx.add("type", "range_scan")
+                   .add("index", cur_key.name)
+                   .add("rows", (*cur_scan)->records);
+
+    Opt_trace_array trace_range(trace, "ranges");
+    for (const SEL_ARG *current = (*cur_scan)->sel_arg->first(); current;
+         current = current->next) {
+      String range_info;
+      range_info.set_charset(system_charset_info);
+      for (const SEL_ARG *part = current; part;
+           part = part->next_key_part ? part->next_key_part : NULL) {
+        const KEY_PART_INFO *cur_key_part = key_part + part->part;
+        append_range(&range_info, cur_key_part, part->min_value,
+                     part->max_value, part->min_flag | part->max_flag);
+      }
+      trace_range.add(range_info);
+    }
+  }
+}
+
+void TRP_RANGE::trace_basic_info(const PARAM *param,
+                                Opt_trace_object *trace_object) const
+{
+  DBUG_ASSERT(param->using_real_indexes);
+  const uint keynr_in_table = param->real_keynr[key_idx];
+
+  const KEY &cur_key = param->table->key_info[keynr_in_table];
+  const KEY_PART_INFO *key_part = cur_key.key_part;
+
+  trace_object->add("type", "range_scan")
+               .add("index", cur_key.name)
+               .add("rows", records);
+
+  Opt_trace_array trace_range(&param->thd->opt_trace, "ranges");
+
+  // TRP_RANGE should not be created if there are no range intervals
+  DBUG_ASSERT(key);
+
+  print_range_all_keyparts(&trace_range, key, key_part);
+}
+
+void TRP_ROR_UNION::trace_basic_info(const PARAM *param,
+                                     Opt_trace_object *trace_object) const {
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  trace_object->add("type", "index_roworder_union");
+  Opt_trace_array ota(trace, "union_of");
+  for (TABLE_READ_PLAN **current = first_ror; current != last_ror; current++) {
+    Opt_trace_object trp_info(trace);
+    (*current)->trace_basic_info(param, &trp_info);
+  }
+}
+
+void TRP_INDEX_INTERSECT::trace_basic_info(const PARAM *param,
+                                       Opt_trace_object *trace_object) const
+{
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  trace_object->add("type", "index_intersect");
+  Opt_trace_array ota(trace, "index_intersect_of");
+  for (TRP_RANGE **current = range_scans; current != range_scans_end;
+       current++) {
+    Opt_trace_object trp_info(trace);
+    (*current)->trace_basic_info(param, &trp_info);
+    if (filtered_scans.is_set(1 << (*current)->key_idx))
+    {
+       trace_object->add("scan_to_be_filtered_by_cpk", true);
+    }
+  }
+}
+
+void TRP_INDEX_MERGE::trace_basic_info(const PARAM *param,
+                                       Opt_trace_object *trace_object) const {
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  trace_object->add("type", "index_merge");
+  Opt_trace_array ota(trace, "index_merge_of");
+  for (TRP_RANGE **current = range_scans; current != range_scans_end;
+       current++) {
+    Opt_trace_object trp_info(trace);
+    (*current)->trace_basic_info(param, &trp_info);
+  }
+}
+
+void TRP_GROUP_MIN_MAX::trace_basic_info(const PARAM *param,
+                                         Opt_trace_object *trace_object) const {
+  trace_object->add("type", "index_group")
+               .add("index", index_info->name);
+  if (min_max_arg_part)
+    trace_object->add("group_attribute",
+                      min_max_arg_part->field->field_name);
+  else
+    trace_object->add_null("group_attribute");
+  trace_object->add("min_aggregate", have_min)
+               .add("max_aggregate", have_max)
+               .add("distinct_aggregate", have_agg_distinct)
+               .add("rows", records)
+               .add("cost", read_cost);
+
+  const KEY_PART_INFO *key_part = index_info->key_part;
+  Opt_trace_ctx *const trace = &param->thd->opt_trace;
+  {
+    Opt_trace_array trace_keyparts(trace, "key_parts_used_for_access");
+    for (uint partno = 0; partno < used_key_parts; partno++)
+    {
+      const KEY_PART_INFO *cur_key_part = key_part + partno;
+      trace_keyparts.add(cur_key_part->field->field_name);
+    }
+  }
+  Opt_trace_array trace_range(trace, "ranges");
+
+  // can have group quick without ranges
+  if (index_tree)
+    print_range_all_keyparts(&trace_range, index_tree, key_part);
+}
+

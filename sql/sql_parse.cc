@@ -3418,7 +3418,6 @@ mysql_execute_command(THD *thd)
   Opt_trace_ctx *trace = &thd->opt_trace;
   Opt_trace_start ots(thd, &thd->opt_trace, thd->query(), thd->query_length(),
                       thd->variables.character_set_client);
-  Opt_trace_object wrapper(trace);
   Opt_trace_array steps(trace, "steps");
 
 #ifdef WITH_WSREP

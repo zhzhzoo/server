@@ -15,11 +15,12 @@
 class Opt_trace_info
 {
 public:
-  Opt_trace_info(const char *query, size_t query_length, const CHARSET_INFO *query_charset)
+  Opt_trace_info(const char *query, size_t query_length, const CHARSET_INFO *query_charset,
+                 bool one_line, bool end_marker)
+    :Json(one_line, end_marker)
   {
     this->query.copy(query, query_length, query_charset);
   }
   String query;
   Json_writer Json;
 };
-

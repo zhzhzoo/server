@@ -87,6 +87,13 @@ public:
   qsort2_cmp compare;
   BUFFPEK_COMPARE_CONTEXT cmp_context;
 
+  enum enum_sort_algorithm {
+    FILESORT_ALG_NONE,
+    FILESORT_ALG_RADIX,
+    FILESORT_ALG_QSORT
+  };
+  enum_sort_algorithm sort_algorithm;
+
   Sort_param()
   {
     memset(this, 0, sizeof(*this));

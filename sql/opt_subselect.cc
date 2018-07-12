@@ -32,6 +32,7 @@
 #include "filesort.h"
 #include "opt_subselect.h"
 #include "sql_test.h"
+#include "opt_trace.h"
 #include <my_bit.h>
 
 /*
@@ -3488,6 +3489,10 @@ void fix_semijoin_strategies_for_picked_join_order(JOIN *join)
   table_map handled_tabs= 0;
   join->sjm_lookup_tables= 0;
   join->sjm_scan_tables= 0;
+  Opt_trace_ctx *trace= &join->thd->opt_trace;
+  Opt_trace_object wrapper(trace);
+  Opt_trace_array trace_fix(trace,
+                      "fixing_semijoin_strategies_for_the_picked_join_order");
   for (tablenr= table_count - 1 ; tablenr != join->const_tables - 1; tablenr--)
   {
     POSITION *pos= join->best_positions + tablenr;
@@ -3499,28 +3504,44 @@ void fix_semijoin_strategies_for_picked_join_order(JOIN *join)
       remaining_tables |= s->table->map;
       continue;
     }
+
+    Opt_trace_object trace_one_table(trace);
+    if (s->table->alias.length() != 0)
+    {
+      trace_one_table.add("table", s->table);
+    }
+    else
+    {
+      trace_one_table.add("table", "intermediate_tmp_table");
+    }
+    trace_one_table.add("at_index", tablenr);
     
     if (pos->sj_strategy == SJ_OPT_MATERIALIZE)
     {
       SJ_MATERIALIZATION_INFO *sjm= s->emb_sj_nest->sj_mat_info;
       sjm->is_used= TRUE;
       sjm->is_sj_scan= FALSE;
+      first= tablenr - sjm->tables + 1;
+      trace_one_table.add("first_index", first)
+                     .add("semijoin_strategy", "materialize");
       memcpy((uchar*) (pos - sjm->tables + 1), (uchar*) sjm->positions,
              sizeof(POSITION) * sjm->tables);
       recalculate_prefix_record_count(join, tablenr - sjm->tables + 1,
                                       tablenr);
-      first= tablenr - sjm->tables + 1;
       join->best_positions[first].n_sj_tables= sjm->tables;
       join->best_positions[first].sj_strategy= SJ_OPT_MATERIALIZE;
       join->sjm_lookup_tables|= s->table->map;
     }
     else if (pos->sj_strategy == SJ_OPT_MATERIALIZE_SCAN)
     {
+      trace_one_table.add("semijoin_strategy", "materialize_scan");
       POSITION *first_inner= join->best_positions + pos->sjmat_picker.sjm_scan_last_inner;
       SJ_MATERIALIZATION_INFO *sjm= first_inner->table->emb_sj_nest->sj_mat_info;
       sjm->is_used= TRUE;
       sjm->is_sj_scan= TRUE;
       first= pos->sjmat_picker.sjm_scan_last_inner - sjm->tables + 1;
+      trace_one_table.add("first_index", first)
+                     .add("semijoin_strategy", "materialize_scan");
       memcpy((uchar*) (join->best_positions + first),
              (uchar*) sjm->positions, sizeof(POSITION) * sjm->tables);
       recalculate_prefix_record_count(join, first, first + sjm->tables);
@@ -3563,6 +3584,8 @@ void fix_semijoin_strategies_for_picked_join_order(JOIN *join)
     if (pos->sj_strategy == SJ_OPT_FIRST_MATCH)
     {
       first= pos->firstmatch_picker.first_firstmatch_table;
+      trace_one_table.add("first_index", first)
+                     .add("semijoin_strategy", "firstmatch");
       join->best_positions[first].sj_strategy= SJ_OPT_FIRST_MATCH;
       join->best_positions[first].n_sj_tables= tablenr - first + 1;
       POSITION dummy; // For loose scan paths
@@ -3596,6 +3619,8 @@ void fix_semijoin_strategies_for_picked_join_order(JOIN *join)
     if (pos->sj_strategy == SJ_OPT_LOOSE_SCAN) 
     {
       first= pos->loosescan_picker.first_loosescan_table;
+      trace_one_table.add("first_index", first)
+                     .add("semijoin_strategy", "loosescan");
       POSITION *first_pos= join->best_positions + first;
       POSITION loose_scan_pos; // For loose scan paths
       double record_count= (first== join->const_tables)? 1.0: 
@@ -3650,6 +3675,8 @@ void fix_semijoin_strategies_for_picked_join_order(JOIN *join)
         this table.
       */
       first= pos->dups_weedout_picker.first_dupsweedout_table;
+      trace_one_table.add("first_index", first)
+                     .add("semijoin_strategy", "dupsweedout");
       join->best_positions[first].sj_strategy= SJ_OPT_DUPS_WEEDOUT;
       join->best_positions[first].n_sj_tables= tablenr - first + 1;
     }

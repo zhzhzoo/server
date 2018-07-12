@@ -43,6 +43,7 @@
 #include "transaction.h"       // trans_commit_stmt
 #include "sql_audit.h"
 #include "debug_sync.h"
+#include "opt_trace.h"
 
 /*
   Sufficient max length of printed destinations and frame offsets (all uints).
@@ -3597,7 +3598,13 @@ sp_instr_stmt::exec_core(THD *thd, uint *nextp)
                          &thd->security_ctx->priv_user[0],
                          (char *)thd->security_ctx->host_or_ip,
                          3);
-  int res= mysql_execute_command(thd);
+  int res;
+  {
+    Opt_trace_ctx *trace= &thd->opt_trace;
+    Opt_trace_object wrapper(trace);
+    Opt_trace_object trace_exec(trace, "stored_procedure_statement_execution");
+    res= mysql_execute_command(thd);
+  }
   MYSQL_QUERY_EXEC_DONE(res);
   *nextp= m_ip+1;
   return res;

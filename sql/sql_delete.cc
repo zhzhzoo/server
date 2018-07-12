@@ -44,6 +44,7 @@
 #include "sql_derived.h"                        // mysql_handle_list_of_derived
                                                 // end_read_record
 #include "sql_partition.h"       // make_used_partitions_str
+#include "opt_trace.h"
 
 #define MEM_STRIP_BUF_SIZE ((size_t) thd->variables.sortbuff_size)
 
@@ -497,24 +498,30 @@ bool mysql_delete(THD *thd, TABLE_LIST *table_list, COND *conds,
   select=make_select(table, 0, 0, conds, (SORT_INFO*) 0, 0, &error);
   if (error)
     DBUG_RETURN(TRUE);
-  if ((select && select->check_quick(thd, safe_update, limit)) || !limit)
-  {
-    query_plan.set_impossible_where();
-    if (thd->lex->describe || thd->lex->analyze_stmt)
-      goto produce_explain_and_leave;
 
-    delete select;
-    free_underlaid_joins(thd, select_lex);
-    /* 
-      Error was already created by quick select evaluation (check_quick()).
-      TODO: Add error code output parameter to Item::val_xxx() methods.
-      Currently they rely on the user checking DA for
-      errors when unwinding the stack after calling Item::val_xxx().
-    */
-    if (thd->is_error())
-      DBUG_RETURN(TRUE);
-    my_ok(thd, 0);
-    DBUG_RETURN(0);				// Nothing to delete
+  {
+    Opt_trace_object wrapper(&thd->opt_trace);
+    wrapper.add("table", table);
+
+    if ((select && select->check_quick(thd, safe_update, limit)) || !limit)
+    {
+      query_plan.set_impossible_where();
+      if (thd->lex->describe || thd->lex->analyze_stmt)
+        goto produce_explain_and_leave;
+
+      delete select;
+      free_underlaid_joins(thd, select_lex);
+      /* 
+         Error was already created by quick select evaluation (check_quick()).
+         TODO: Add error code output parameter to Item::val_xxx() methods.
+         Currently they rely on the user checking DA for
+         errors when unwinding the stack after calling Item::val_xxx().
+       */
+      if (thd->is_error())
+        DBUG_RETURN(TRUE);
+      my_ok(thd, 0);
+      DBUG_RETURN(0);				// Nothing to delete
+    }
   }
 
   /* If running in safe sql mode, don't allow updates without keys */

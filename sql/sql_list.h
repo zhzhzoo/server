@@ -234,6 +234,15 @@ public:
       last= &first;
     return tmp->info;
   }
+  inline void *pop_back(void)
+  {
+    if (first == &end_of_list) return 0;
+    list_node *tmp=first;
+    first=first->next;
+    if (!--elements)
+      last= &first;
+    return tmp->info;
+  }
 
   /*
     Remove from this list elements that are contained in the passed list. 

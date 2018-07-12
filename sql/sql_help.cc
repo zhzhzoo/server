@@ -20,6 +20,7 @@
 #include "sql_table.h"                          // primary_key_name
 #include "sql_base.h"               // REPORT_ALL_ERRORS, setup_tables
 #include "opt_range.h"              // SQL_SELECT
+#include "opt_trace.h"
 #include "records.h"          // init_read_record, end_read_record
 
 struct st_find_field
@@ -611,12 +612,16 @@ int send_variant_2_list(MEM_ROOT *mem_root, Protocol *protocol,
 SQL_SELECT *prepare_simple_select(THD *thd, Item *cond,
 				  TABLE *table, int *error)
 {
+  Opt_trace_ctx *trace = &thd->opt_trace;
+  Opt_trace_object wrapper(trace);
+  Opt_trace_object prepare_select(trace, "prepare_select");
   if (!cond->fixed)
     cond->fix_fields(thd, &cond);	// can never fail
 
   /* Assume that no indexes cover all required fields */
   table->covering_keys.clear_all();
 
+  Opt_trace_object(trace, "select").add("table", table).add("cond", cond);
   SQL_SELECT *res= make_select(table, 0, 0, cond, 0, 0, error);
   if (*error || (res && res->check_quick(thd, 0, HA_POS_ERROR)) ||
       (res && res->quick && res->quick->reset()))

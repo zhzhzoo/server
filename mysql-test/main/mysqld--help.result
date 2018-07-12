@@ -226,6 +226,10 @@ The following specify which files/extra groups are read (specified before remain
  query execution)
  --encrypt-tmp-files Encrypt temporary files (created for filesort, binary log
  cache, etc)
+ --end-markers-in-json 
+ In JSON output ("EXPLAIN FORMAT=JSON" and optimizer
+ trace), if variable is set to 1, repeats the structure's
+ key (if it has one) near the closing bracket
  --enforce-storage-engine=name 
  Force the use of a storage engine for new tables
  --event-scheduler[=name] 
@@ -668,6 +672,24 @@ The following specify which files/extra groups are read (specified before remain
  optimize_join_buffer_size, table_elimination, 
  extended_keys, exists_to_in, orderby_uses_equalities, 
  condition_pushdown_for_derived, split_materialized
+ --optimizer-trace=name 
+ Controls tracing of the Optimizer:
+ optimizer_trace=option=val[,option=val...], where option
+ is one of {enabled, one_line} and val is one of {on,
+ default}
+ --optimizer-trace-features=name 
+ Enables/disables tracing of selected features of the
+ Optimizer:
+ optimizer_trace_features=option=val[,option=val...],
+ where option is one of {greedy_search, range_optimizer,
+ dynamic_range, repeated_subselect} and val is one of {on,
+ off, default}
+ --optimizer-trace-limit=# 
+ Maximum number of shown optimizer traces
+ --optimizer-trace-max-mem-size=# 
+ Maximum allowed cumulated size of stored optimizer traces
+ --optimizer-trace-offset=# 
+ Offset of first optimizer trace to show; see manual
  --optimizer-use-condition-selectivity=# 
  Controls selectivity of which conditions the optimizer
  takes into account to calculate cardinality of a partial
@@ -1384,6 +1406,7 @@ div-precision-increment 4
 encrypt-binlog FALSE
 encrypt-tmp-disk-tables FALSE
 encrypt-tmp-files FALSE
+end-markers-in-json FALSE
 enforce-storage-engine (No default value)
 event-scheduler OFF
 expensive-subquery-limit 100
@@ -1517,6 +1540,11 @@ optimizer-prune-level 1
 optimizer-search-depth 62
 optimizer-selectivity-sampling-limit 100
 optimizer-switch index_merge=on,index_merge_union=on,index_merge_sort_union=on,index_merge_intersection=on,index_merge_sort_intersection=off,engine_condition_pushdown=off,index_condition_pushdown=on,derived_merge=on,derived_with_keys=on,firstmatch=on,loosescan=on,materialization=on,in_to_exists=on,semijoin=on,partial_match_rowid_merge=on,partial_match_table_scan=on,subquery_cache=on,mrr=off,mrr_cost_based=off,mrr_sort_keys=off,outer_join_with_cache=on,semijoin_with_cache=on,join_cache_incremental=on,join_cache_hashed=on,join_cache_bka=on,optimize_join_buffer_size=off,table_elimination=on,extended_keys=on,exists_to_in=on,orderby_uses_equalities=on,condition_pushdown_for_derived=on,split_materialized=on
+optimizer-trace 
+optimizer-trace-features greedy_search=on,range_optimizer=on,dynamic_range=on,repeated_subselect=on
+optimizer-trace-limit 1
+optimizer-trace-max-mem-size 1048576
+optimizer-trace-offset -1
 optimizer-use-condition-selectivity 1
 performance-schema FALSE
 performance-schema-accounts-size -1

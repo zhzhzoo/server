@@ -2440,4 +2440,7 @@ int create_sort_index(THD *thd, JOIN *join, JOIN_TAB *tab, Filesort *fsort);
 JOIN_TAB *first_explain_order_tab(JOIN* join);
 JOIN_TAB *next_explain_order_tab(JOIN* join, JOIN_TAB* tab);
 
+class Opt_trace_array;
+void print_index_in_tree(const JOIN *join, const JOIN_TAB *tab, Opt_trace_array *trace);
+
 #endif /* SQL_SELECT_INCLUDED */

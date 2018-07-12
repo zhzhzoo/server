@@ -23,6 +23,7 @@
 #include "sql_cursor.h"
 #include "probes_mysql.h"
 #include "sql_parse.h"                        // mysql_execute_command
+#include "opt_trace.h"
 
 /****************************************************************************
   Declarations.
@@ -142,7 +143,12 @@ int mysql_open_cursor(THD *thd, select_result *result,
   thd->m_statement_psi= NULL;
   /* Mark that we can't use query cache with cursors */
   thd->query_cache_is_applicable= 0;
-  rc= mysql_execute_command(thd);
+  {
+    Opt_trace_ctx *trace= &thd->opt_trace;
+    Opt_trace_object wrapper(trace);
+    Opt_trace_object trace_cursor(trace, "materializing_cursor");
+    rc= mysql_execute_command(thd);
+  }
   thd->lex->restore_set_statement_var();
   thd->m_digest= parent_digest;
   thd->m_statement_psi= parent_locker;

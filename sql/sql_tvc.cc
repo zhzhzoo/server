@@ -22,6 +22,7 @@
 #include "sql_explain.h"
 #include "sql_parse.h"
 #include "sql_cte.h"
+#include "opt_trace.h"
 
 /**
   @brief
@@ -819,22 +820,28 @@ bool JOIN::transform_in_predicates_into_in_subq(THD *thd)
   if (!select_lex->in_funcs.elements)
     DBUG_RETURN(false);
 
+  Opt_trace_ctx *trace= &thd->opt_trace;
+  Opt_trace_object wrapper(trace);
+  Opt_trace_object trace_transform(trace, "transform_in_predicates_into_in_subquery");
   SELECT_LEX *save_current_select= thd->lex->current_select;
   enum_parsing_place save_parsing_place= select_lex->parsing_place;
   thd->lex->current_select= select_lex;
   if (conds)
   {
     select_lex->parsing_place= IN_WHERE;
+    trace_transform.add("original_condition", conds);
     conds=
       conds->transform(thd,
 		       &Item::in_predicate_to_in_subs_transformer,
                        (uchar*) 0);
+    trace_transform.add("resulting_condition", conds);
     if (!conds)
       DBUG_RETURN(true);
     select_lex->prep_where= conds ? conds->copy_andor_structure(thd) : 0;
     select_lex->where= conds;
   }
 
+  Opt_trace_array steps(trace, "join_list");
   if (join_list)
   {
     TABLE_LIST *table;
@@ -845,10 +852,14 @@ bool JOIN::transform_in_predicates_into_in_subq(THD *thd)
     {
       if (table->on_expr)
       {
+        Opt_trace_object wrapper_on(trace);
+        wrapper_on.add("table", table);
+        wrapper_on.add("original_on_expression",table->on_expr);
         table->on_expr=
           table->on_expr->transform(thd,
 		                    &Item::in_predicate_to_in_subs_transformer,
                                     (uchar*) 0);
+        wrapper_on.add("resulting_on_expression",table->on_expr);
 	if (!table->on_expr)
 	  DBUG_RETURN(true);
 	table->prep_on_expr= table->on_expr ?

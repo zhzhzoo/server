@@ -256,10 +256,6 @@
                                     OPTIMIZER_SWITCH_COND_PUSHDOWN_FOR_DERIVED | \
                                     OPTIMIZER_SWITCH_SPLIT_MATERIALIZED)
 
-/* @@optimizer_trace flags. */
-#define OPTIMIZER_TRACE_ENABLED (1ULL << 0)
-
-
 /*
   Replication uses 8 bytes to store SQL_MODE in the binary log. The day you
   use strictly more than 64 bits by adding one more define above, you should

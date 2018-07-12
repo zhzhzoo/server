@@ -34,6 +34,7 @@ public:
   ~Opt_trace_start();
 private:
   Opt_trace_ctx *ctx;
+  bool enabled_at_init;
 };
 
 class Opt_trace_object
@@ -42,18 +43,22 @@ public:
   Opt_trace_object(Opt_trace_ctx *ctx);
   Opt_trace_object(Opt_trace_ctx *ctx, const char *k);
   ~Opt_trace_object();
-  Opt_trace_object &add(const char *k, longlong v);
   Opt_trace_object &add(const char *k, double v);
   Opt_trace_object &add(const char *k, int v);
+  Opt_trace_object &add(const char *k, long int v);
+  Opt_trace_object &add(const char *k, longlong v);
   Opt_trace_object &add(const char *k, uint v);
   Opt_trace_object &add(const char *k, ulong v);
   Opt_trace_object &add(const char *k, ulonglong v);
   Opt_trace_object &add(const char *k, bool v);
   Opt_trace_object &add(const char *k, const char* v);
   Opt_trace_object &add(const char *k, const String &v);
-  Opt_trace_object &add(const char *k, LEX_CSTRING &v);
+  Opt_trace_object &add(const char *k, LEX_CSTRING v);
   Opt_trace_object &add(const char *k, COND *v);
   Opt_trace_object &add(const char *k, TABLE_LIST *v);
+  Opt_trace_object &add(const char *k, TABLE *v);
+  Opt_trace_object &add(const char *k, SELECT_LEX *v);
+  Opt_trace_object &add(const char *k, ORDER *v);
   Opt_trace_object &add(const char *k);
   Opt_trace_object &add_null(const char *k);
 private:
@@ -66,22 +71,36 @@ public:
   Opt_trace_array(Opt_trace_ctx *ctx);
   Opt_trace_array(Opt_trace_ctx *ctx, const char *k);
   ~Opt_trace_array();
-  Opt_trace_array &add(longlong v);
   Opt_trace_array &add(double v);
   Opt_trace_array &add(int v);
+  Opt_trace_array &add(long int v);
+  Opt_trace_array &add(longlong v);
   Opt_trace_array &add(uint v);
   Opt_trace_array &add(ulong v);
   Opt_trace_array &add(ulonglong v);
   Opt_trace_array &add(bool v);
   Opt_trace_array &add(const char* v);
   Opt_trace_array &add(const String &v);
-  Opt_trace_array &add(LEX_CSTRING &v);
+  Opt_trace_array &add(LEX_CSTRING v);
   Opt_trace_array &add(COND *v);
   Opt_trace_array &add(TABLE_LIST *v);
+  Opt_trace_array &add(TABLE *v);
+  Opt_trace_array &add(SELECT_LEX *v);
+  Opt_trace_array &add(ORDER *v);
   Opt_trace_array &add_null();
 private:
   Opt_trace_ctx *ctx;
 };
 
-int fill_optimizer_trace_info(THD *thd, TABLE_LIST *tables, Item *);
+template <class T>
+class Opt_trace_if
+{
+public:
+  Opt_trace_if(bool b, Opt_trace_ctx *ctx) : initialized(b)
+  { if (b) new(buf) T(ctx); }
+  ~Opt_trace_if() { if (initialized) ((T *)buf)->~T(); }
+private:
+  char buf[sizeof(T)];
+  bool initialized;
+};
 #endif

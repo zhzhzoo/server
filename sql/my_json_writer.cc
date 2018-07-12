@@ -16,11 +16,15 @@
 #include "mariadb.h"
 #include "sql_priv.h"
 #include "sql_string.h"
+#include "sql_list.h"
+#include "sql_array.h"
 
 #include "my_json_writer.h"
 
 void Json_writer::append_indent()
 {
+  if (one_line)
+    return;
   if (!document_start)
     output.append('\n');
   for (int i=0; i< indent_level; i++)
@@ -29,40 +33,50 @@ void Json_writer::append_indent()
 
 void Json_writer::start_object()
 {
+  this_member_has_name = false;
   fmt_helper.on_start_object();
+
+  if (end_marker && !this_member_has_name)
+    member_name_beginnings.append_val(*member_name_beginnings.back());
 
   if (!element_started)
     start_element();
 
   output.append("{");
   indent_level+=INDENT_SIZE;
-  first_child=true;
+  first_child.append_val(true);
   element_started= false;
   document_start= false;
 }
 
 void Json_writer::start_array()
 {
+  bool orig_this_member_has_name = this_member_has_name;
+  this_member_has_name = false;
+
   if (fmt_helper.on_start_array())
     return;
+
+  if (end_marker && !orig_this_member_has_name)
+    member_name_beginnings.append_val(*member_name_beginnings.back());
 
   if (!element_started)
     start_element();
 
   output.append("[");
   indent_level+=INDENT_SIZE;
-  first_child=true;
+  first_child.append_val(true);
   element_started= false;
   document_start= false;
 }
 
-
 void Json_writer::end_object()
 {
   indent_level-=INDENT_SIZE;
-  if (!first_child)
+  if (!first_child.pop())
     append_indent();
   output.append("}");
+  add_end_marker();
 }
 
 
@@ -70,17 +84,29 @@ void Json_writer::end_array()
 {
   if (fmt_helper.on_end_array())
     return;
+
   indent_level-=INDENT_SIZE;
-  if (!first_child)
+  if (!first_child.pop())
     append_indent();
   output.append("]");
+  // if fmt_helper helped with this array we don't add end marker
+  add_end_marker();
 }
 
 
 Json_writer& Json_writer::add_member(const char *name)
 {
+  size_t len = strlen(name);
+
   if (fmt_helper.on_add_member(name))
     return *this; // handled
+
+  if (end_marker)
+  {
+    member_name_beginnings.append_val(*member_name_beginnings.back() + len);
+    member_names.append(name);
+    this_member_has_name = true;
+  }
 
   // assert that we are in an object
   DBUG_ASSERT(!element_started);
@@ -101,8 +127,8 @@ Json_writer& Json_writer::add_member(const char *name)
 void Json_writer::start_sub_element()
 {
   //element_started= true;
-  if (first_child)
-    first_child= false;
+  if (*first_child.back())
+    *first_child.back()= false;
   else
     output.append(',');
 
@@ -114,8 +140,8 @@ void Json_writer::start_element()
 {
   element_started= true;
 
-  if (first_child)
-    first_child= false;
+  if (*first_child.back())
+    *first_child.back()= false;
   else
     output.append(',');
 
@@ -173,35 +199,59 @@ void Json_writer::add_null()
 
 void Json_writer::add_unquoted_str(const char* str)
 {
-  if (fmt_helper.on_add_str(str))
+  size_t len = strlen(str);
+  if (fmt_helper.on_add_str(str, len, /* unquoted= */true))
     return;
 
   if (!element_started)
     start_element();
 
+  remove_name();
   output.append(str);
   element_started= false;
 }
 
 
-void Json_writer::add_str(const char *str)
+void Json_writer::add_str(const char *str, size_t len)
 {
-  if (fmt_helper.on_add_str(str))
+  if (fmt_helper.on_add_str(str, len))
     return;
 
   if (!element_started)
     start_element();
 
+  remove_name();
   output.append('"');
-  output.append(str);
+  output.append(str, len);
   output.append('"');
   element_started= false;
 }
 
 
-void Json_writer::add_str(const String &str)
+void Json_writer::remove_name()
 {
-  add_str(str.ptr());
+  if (this_member_has_name)
+  {
+    member_name_beginnings.pop();
+    this_member_has_name = false;
+    member_names.length(*member_name_beginnings.back());
+  }
+}
+
+
+void Json_writer::add_end_marker()
+{
+  if (!end_marker)
+    return;
+  int end_pos = member_name_beginnings.pop();
+  int start_pos = *member_name_beginnings.back();
+  if (start_pos != end_pos)
+  {
+    output.append(" /* ");
+    output.append(member_names.c_ptr() + start_pos, end_pos - start_pos);
+    output.append(" */");
+  }
+  member_names.length(start_pos);
 }
 
 
@@ -267,26 +317,30 @@ void Single_line_formatting_helper::on_start_object()
 }
 
 
-bool Single_line_formatting_helper::on_add_str(const char *str)
+bool Single_line_formatting_helper::on_add_str(const char *str, size_t len,
+                                               bool unquoted)
 {
   if (state == IN_ARRAY)
   {
-    size_t len= strlen(str);
-
     // New length will be:
     //  "$string", 
     //  quote + quote + comma + space = 4
-    if (line_len + len + 4 > MAX_LINE_LEN)
+    //  or unquoted
+    //  comma + space = 2
+    size_t additional_len = unquoted ? 2 : 4;
+
+    if (line_len + len + additional_len > MAX_LINE_LEN)
     {
       disable_and_flush();
       return false; // didn't handle the last element
     }
 
     //append string to array
+    buf_unquoted[buf_ptr - buffer] = unquoted;
     memcpy(buf_ptr, str, len);
     buf_ptr+=len;
     *(buf_ptr++)= 0;
-    line_len += (uint)len + 4;
+    line_len += (uint)len + additional_len;
     return true; // handled
   }
 
@@ -319,9 +373,14 @@ void Single_line_formatting_helper::flush_on_one_line()
     {
       if (nr != 1)
         owner->output.append(", ");
-      owner->output.append('"');
-      owner->output.append(str);
-      owner->output.append('"');
+      if (buf_unquoted[str - buffer])
+        owner->output.append(str);
+      else
+      {
+        owner->output.append('"');
+        owner->output.append(str);
+        owner->output.append('"');
+      }
     }
     nr++;
 
@@ -358,7 +417,10 @@ void Single_line_formatting_helper::disable_and_flush()
     {
       //if (nr == 1)
       //  owner->start_array();
-      owner->add_str(str);
+      if (buf_unquoted[str - buffer])
+        owner->add_unquoted_str(str);
+      else
+        owner->add_str(str);
     }
     
     nr++;

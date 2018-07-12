@@ -157,21 +157,26 @@ void Filesort_buffer::free_sort_buffer()
 }
 
 
-void Filesort_buffer::sort_buffer(const Sort_param *param, uint count)
+void Filesort_buffer::sort_buffer(Sort_param *param, uint count)
 {
   size_t size= param->sort_length;
   if (count <= 1 || size == 0)
+  {
+    param->sort_algorithm = Sort_param::FILESORT_ALG_NONE;
     return;
+  }
   uchar **keys= get_sort_keys();
   uchar **buffer= NULL;
   if (radixsort_is_appliccable(count, param->sort_length) &&
       (buffer= (uchar**) my_malloc(count*sizeof(char*),
                                    MYF(MY_THREAD_SPECIFIC))))
   {
+    param->sort_algorithm = Sort_param::FILESORT_ALG_RADIX;
     radixsort_for_str_ptr(keys, count, param->sort_length, buffer);
     my_free(buffer);
     return;
   }
   
+  param->sort_algorithm = Sort_param::FILESORT_ALG_QSORT;
   my_qsort2(keys, count, sizeof(uchar*), get_ptr_compare(size), &size);
 }

@@ -42,6 +42,7 @@
 #include "sql_parse.h"                          // check_stack_overrun
 #include "sql_cte.h"
 #include "sql_test.h"
+#include "opt_trace.h"
 
 double get_post_group_estimate(JOIN* join, double join_op_rows);
 
@@ -1889,7 +1890,7 @@ Item_in_subselect::single_value_transformer(JOIN *join)
 
 
 /**
-  Apply transformation max/min  transwormation to ALL/ANY subquery if it is
+  Apply transformation max/min  transformation to ALL/ANY subquery if it is
   possible.
 
   @param join  Join object of the subquery (i.e. 'child' join).
@@ -1919,6 +1920,10 @@ bool Item_allany_subselect::transform_into_max_min(JOIN *join)
   SELECT_LEX *select_lex= join->select_lex;
   Item *subs;
   DBUG_ASSERT(thd == join->thd);
+  Opt_trace_ctx *trace= &thd->opt_trace;
+  Opt_trace_object wrapper(trace);
+  Opt_trace_object trace_transform(trace, "transforming_all/any_subquery_into_max/min");
+  trace_transform.add("original_subquery", select_lex);
 
   /*
   */
@@ -1939,6 +1944,7 @@ bool Item_allany_subselect::transform_into_max_min(JOIN *join)
       (!select_lex->ref_pointer_array[0]->maybe_null ||  /*4*/
        substype() != Item_subselect::ALL_SUBS))          /*4*/
   {
+    trace_transform.add("can_rewrite_into_one_line_aggregate", true);
     Item_sum_hybrid *item;
     nesting_map save_allow_sum_func;
     if (func->l_op())
@@ -1997,6 +2003,7 @@ bool Item_allany_subselect::transform_into_max_min(JOIN *join)
   }
   else
   {
+    trace_transform.add("can_rewrite_into_one_line_aggregate", false);
     Item_maxmin_subselect *item;
     subs= item= new (thd->mem_root) Item_maxmin_subselect(thd, this, select_lex, func->l_op());
     if (upper_item)
@@ -2019,6 +2026,8 @@ bool Item_allany_subselect::transform_into_max_min(JOIN *join)
 
   select_lex->master_unit()->uncacheable&= ~UNCACHEABLE_DEPENDENT_INJECTED;
   select_lex->uncacheable&= ~UNCACHEABLE_DEPENDENT_INJECTED;
+
+  trace_transform.add("resulting_subquery", select_lex);
 
   DBUG_RETURN(false);
 }
@@ -2855,25 +2864,64 @@ bool Item_exists_subselect::exists2in_processor(void *opt_arg)
   DBUG_ENTER("Item_exists_subselect::exists2in_processor");
 
   if (!optimizer ||
-      !optimizer_flag(thd, OPTIMIZER_SWITCH_EXISTS_TO_IN) ||
-      (!is_top_level_item() && (!upper_not ||
-                                !upper_not->is_top_level_item())) ||
-      first_select->is_part_of_union() ||
-      first_select->group_list.elements ||
+      !optimizer_flag(thd, OPTIMIZER_SWITCH_EXISTS_TO_IN))
+    DBUG_RETURN(FALSE);
+
+  Opt_trace_ctx *trace= &thd->opt_trace;
+  trace->create_pending();
+  Opt_trace_object trace_exists2in(trace);
+  if (upper_not)
+  {
+    trace_exists2in.add("original_subselect", upper_not);
+  }
+  else
+  {
+    trace_exists2in.add("original_subselect", this);
+  }
+  if ((!is_top_level_item() && (!upper_not ||
+                                !upper_not->is_top_level_item())))
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause", "not_top_level");
+    DBUG_RETURN(FALSE);
+  }
+
+  trace_exists2in.add("original_query", first_select);
+  if (first_select->is_part_of_union())
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause", "subqueries_are_unions");
+    DBUG_RETURN(FALSE);
+  }
+  if (first_select->group_list.elements ||
       first_select->order_list.elements ||
       join->having ||
-      first_select->with_sum_func ||
-      !first_select->leaf_tables.elements||
+      first_select->with_sum_func)
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause",
+        "have_group_by_aggregate_functions_or_having_clause");
+    DBUG_RETURN(FALSE);
+  }
+  if (!first_select->leaf_tables.elements||
       !join->conds ||
       with_recursive_reference)
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause", "degenerate_edge_cases");
     DBUG_RETURN(FALSE);
+  }
 
   DBUG_ASSERT(first_select->order_list.elements == 0 &&
               first_select->group_list.elements == 0 &&
               first_select->having == NULL);
 
   if (find_inner_outer_equalities(&join->conds, eqs))
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause", "degenerate_edge_cases");
     DBUG_RETURN(FALSE);
+  }
 
   DBUG_ASSERT(eqs.elements() != 0);
 
@@ -2894,16 +2942,25 @@ bool Item_exists_subselect::exists2in_processor(void *opt_arg)
     DBUG_ASSERT(prm.count >= (uint)eqs.elements());
     will_be_correlated= prm.count > (uint)eqs.elements();
     if (upper_not && will_be_correlated)
+    {
+      trace_exists2in.add("applicable", false);
+      trace_exists2in.add("cause", "not_trivially_correlated");
       goto out;
+    }
   }
 
   if ((uint)eqs.elements() > (first_select->item_list.elements +
                               first_select->select_n_reserved))
+  {
+    trace_exists2in.add("applicable", false);
+    trace_exists2in.add("cause", "not_trivially_correlated");
     goto out;
+  }
   /* It is simple query */
   DBUG_ASSERT(first_select->join->all_fields.elements ==
               first_select->item_list.elements);
 
+  trace_exists2in.add("applicable", true);
   arena= thd->activate_stmt_arena_if_needed(&backup);
 
   while (first_select->item_list.elements > (uint)eqs.elements())
@@ -3122,6 +3179,7 @@ bool Item_exists_subselect::exists2in_processor(void *opt_arg)
       goto out;
     }
   }
+  trace_exists2in.add("resulting_query", first_select);
 
 out:
   thd->lex->current_select= save_select;

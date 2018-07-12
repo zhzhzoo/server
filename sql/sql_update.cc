@@ -46,6 +46,7 @@
 
 #include "sql_insert.h"  // For vers_insert_history_row() that may be
                          //   needed for System Versioning.
+#include "opt_trace.h"
 
 /**
    True if the table's input and output record buffers are comparable using
@@ -271,6 +272,8 @@ static void prepare_record_for_error_message(int error, TABLE *table)
   Process usual UPDATE
 
   SYNOPSIS
+  ss usual UPDATE
+ (--ctx->start_cnt == 0)
     mysql_update()
     thd			thread handler
     fields		fields for update
@@ -471,29 +474,34 @@ int mysql_update(THD *thd,
   set_statistics_for_table(thd, table);
 
   select= make_select(table, 0, 0, conds, (SORT_INFO*) 0, 0, &error);
-  if (error || !limit || thd->is_error() ||
-      (select && select->check_quick(thd, safe_update, limit)))
-  {
-    query_plan.set_impossible_where();
-    if (thd->lex->describe || thd->lex->analyze_stmt)
-      goto produce_explain_and_leave;
+  {  // Enter scope for optimizer trace wrapper
+    Opt_trace_object  wrapper(&thd->opt_trace);
+    wrapper.add("table", table);
 
-    delete select;
-    free_underlaid_joins(thd, select_lex);
-    /*
-      There was an error or the error was already sent by
-      the quick select evaluation.
-      TODO: Add error code output parameter to Item::val_xxx() methods.
-      Currently they rely on the user checking DA for
-      errors when unwinding the stack after calling Item::val_xxx().
-    */
-    if (error || thd->is_error())
+    if (error || !limit || thd->is_error() ||
+        (select && select->check_quick(thd, safe_update, limit)))
     {
-      DBUG_RETURN(1);				// Error in where
+      query_plan.set_impossible_where();
+      if (thd->lex->describe || thd->lex->analyze_stmt)
+        goto produce_explain_and_leave;
+
+      delete select;
+      free_underlaid_joins(thd, select_lex);
+      /*
+         There was an error or the error was already sent by
+         the quick select evaluation.
+         TODO: Add error code output parameter to Item::val_xxx() methods.
+         Currently they rely on the user checking DA for
+         errors when unwinding the stack after calling Item::val_xxx().
+       */
+      if (error || thd->is_error())
+      {
+        DBUG_RETURN(1);				// Error in where
+      }
+      my_ok(thd);				// No matching records
+      DBUG_RETURN(0);
     }
-    my_ok(thd);				// No matching records
-    DBUG_RETURN(0);
-  }
+  }  // Ends scope for optimizer trace wrapper
 
   /* If running in safe sql mode, don't allow updates without keys */
   if (table->quick_keys.is_clear_all())

@@ -112,6 +112,7 @@ When one supplies long data for a placeholder:
 #include "sp_cache.h"
 #include "sql_handler.h"  // mysql_ha_rm_tables
 #include "probes_mysql.h"
+#include "opt_trace.h"
 #ifdef EMBEDDED_LIBRARY
 /* include MYSQL_BIND headers */
 #include <mysql.h>
@@ -4756,9 +4757,14 @@ bool Prepared_statement::execute(String *expanded_query, bool open_cursor)
                              (char *) thd->security_ctx->host_or_ip,
                              1);
       parent_locker= thd->m_statement_psi;
-      thd->m_statement_psi= NULL;
-      error= mysql_execute_command(thd);
-      thd->m_statement_psi= parent_locker;
+      {
+        Opt_trace_ctx *trace= &thd->opt_trace;
+        Opt_trace_object wrapper(trace);
+        Opt_trace_object trace_prepared(trace, "executing_prepared_stmt");
+        thd->m_statement_psi= NULL;
+        error= mysql_execute_command(thd);
+        thd->m_statement_psi= parent_locker;
+      }
       MYSQL_QUERY_EXEC_DONE(error);
     }
     else

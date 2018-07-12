@@ -12,8 +12,11 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02111-1301 USA */
+#include "m_string.h"
+
 
 class Json_writer;
+template <class T> class List;
 
 /*
   Single_line_formatting_helper is used by Json_writer to do better formatting
@@ -67,6 +70,7 @@ class Single_line_formatting_helper
   enum enum_state state;
   enum { MAX_LINE_LEN= 80 };
   char buffer[80];
+  bool buf_unquoted[80];
 
   /* The data in the buffer is located between buffer[0] and buf_ptr */
   char *buf_ptr;
@@ -85,7 +89,7 @@ public:
   void on_start_object();
   // on_end_object() is not needed.
    
-  bool on_add_str(const char *str);
+  bool on_add_str(const char *str, size_t len, bool unquoted=false);
 
   void flush_on_one_line();
   void disable_and_flush();
@@ -104,8 +108,10 @@ public:
   Json_writer& add_member(const char *name);
   
   /* Add atomic values */
-  void add_str(const char* val);
-  void add_str(const String &str);
+  void add_str(const char* val) { add_str(val, strlen(val)); }
+  void add_str(const char* val, size_t len);
+  void add_str(const String &str) { add_str(str.ptr(), str.length()); }
+  void add_str(const LEX_CSTRING *str) { add_str(str->str, str->length); };
 
   void add_ll(longlong val);
   void add_size(longlong val);
@@ -115,6 +121,8 @@ public:
 
 private:
   void add_unquoted_str(const char* val);
+  void add_end_marker();
+  void remove_name();
 public:
   /* Start a child object */
   void start_object();
@@ -122,12 +130,14 @@ public:
 
   void end_object();
   void end_array();
-  
-  Json_writer() : 
-    indent_level(0), document_start(true), element_started(false), 
-    first_child(true)
+
+  Json_writer(bool one_line=false, bool end_marker=false) : 
+    indent_level(0), document_start(true), element_started(false),
+    one_line(one_line), end_marker(end_marker), this_member_has_name(false)
   {
     fmt_helper.init(this);
+    member_name_beginnings.append_val(0);
+    first_child.append_val(true);
   }
 private:
   // TODO: a stack of (name, bool is_object_or_array) elements.
@@ -138,7 +148,9 @@ private:
   friend class Json_writer_nesting_guard;
   bool document_start;
   bool element_started;
-  bool first_child;
+
+  // yes, first_child should be a stack
+  Dynamic_array<bool> first_child;
 
   Single_line_formatting_helper fmt_helper;
 
@@ -146,7 +158,12 @@ private:
   void start_element();
   void start_sub_element();
 
-  //const char *new_member_name;
+  const bool one_line;
+  const bool end_marker;
+  bool this_member_has_name;
+  //a stack to hold all member's names
+  String member_names;
+  Dynamic_array<int> member_name_beginnings;
 public:
   String output;
 };
