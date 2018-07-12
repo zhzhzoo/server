@@ -22,16 +22,15 @@
 #include "opt_trace_info.h"
 #include "opt_trace.h"
 
-#define QT_OPT_TRACE enum_query_type(QT_WITHOUT_INTRODUCERS \
-  | QT_TO_SYSTEM_CHARSET | QT_SHOW_SELECT_NUMBER \
-  | QT_ITEM_IDENT_SKIP_DB_NAMES)
-
-static void do_add(Json_writer *writer, COND *cond)
+static void do_add(Json_writer *writer, THD *thd, COND *cond)
 {
   StringBuffer<1024> str;
   if (cond)
   {
-    cond->print(&str, QT_OPT_TRACE);
+    ulonglong save_option_bits= thd->variables.option_bits;
+    thd->variables.option_bits &= ~OPTION_QUOTE_SHOW_CREATE;
+    cond->print(&str, QT_EXPLAIN);
+    thd->variables.option_bits= save_option_bits;
     writer->add_str(str);
   }
   else
@@ -44,7 +43,10 @@ static void do_add(Json_writer *writer, THD *thd, SELECT_LEX *select_lex)
   StringBuffer<1024> str;
   if (select_lex)
   {
-    select_lex->print(thd, &str, QT_OPT_TRACE);
+    ulonglong save_option_bits= thd->variables.option_bits;
+    thd->variables.option_bits &= ~OPTION_QUOTE_SHOW_CREATE;
+    select_lex->print(thd, &str, QT_EXPLAIN);
+    thd->variables.option_bits= save_option_bits;
     writer->add_str(str);
   }
   else
@@ -57,7 +59,10 @@ static void do_add(Json_writer *writer, THD *thd, TABLE_LIST *tl)
   StringBuffer<1024> str;
   if (tl)
   {
-    tl->print(thd, (table_map) 0L, &str, QT_OPT_TRACE);
+    ulonglong save_option_bits= thd->variables.option_bits;
+    thd->variables.option_bits &= ~OPTION_QUOTE_SHOW_CREATE;
+    tl->print(thd, (table_map) 0L, &str, QT_EXPLAIN);
+    thd->variables.option_bits= save_option_bits;
     writer->add_str(str);
   }
   else
@@ -65,12 +70,15 @@ static void do_add(Json_writer *writer, THD *thd, TABLE_LIST *tl)
 }
 
 
-static void do_add(Json_writer *writer, ORDER *o)
+static void do_add(Json_writer *writer, THD *thd, ORDER *o)
 {
   StringBuffer<128> str;
   if (o)
   {
-    SELECT_LEX::print_order(&str, o, QT_OPT_TRACE);
+    ulonglong save_option_bits= thd->variables.option_bits;
+    thd->variables.option_bits &= ~OPTION_QUOTE_SHOW_CREATE;
+    SELECT_LEX::print_order(&str, o, QT_EXPLAIN);
+    thd->variables.option_bits= save_option_bits;
     writer->add_str(str);
   }
   else
@@ -397,7 +405,7 @@ Opt_trace_object &Opt_trace_object::add(const char *k, COND *v)
 #ifndef DBUG_OFF
   DBUG_ASSERT(ctx->top_state() == Opt_trace_ctx::OPT_OBJECT);
 #endif
-  do_add(&ctx->current_Json()->add_member(k), v);
+  do_add(&ctx->current_Json()->add_member(k), ctx->thd, v);
   return *this;
 }
 
@@ -441,7 +449,7 @@ Opt_trace_object &Opt_trace_object::add(const char *k, ORDER *v)
 #ifndef DBUG_OFF
   DBUG_ASSERT(ctx->top_state() == Opt_trace_ctx::OPT_OBJECT);
 #endif
-  do_add(&ctx->current_Json()->add_member(k), v);
+  do_add(&ctx->current_Json()->add_member(k), ctx->thd, v);
   return *this;
 }
 
@@ -626,7 +634,7 @@ Opt_trace_array &Opt_trace_array::add(COND *v)
 #ifndef DBUG_OFF
   DBUG_ASSERT(ctx->top_state() == Opt_trace_ctx::OPT_ARRAY);
 #endif
-  do_add(ctx->current_Json(), v);
+  do_add(ctx->current_Json(), ctx->thd, v);
   return *this;
 }
 
@@ -670,7 +678,7 @@ Opt_trace_array &Opt_trace_array::add(ORDER *v)
 #ifndef DBUG_OFF
   DBUG_ASSERT(ctx->top_state() == Opt_trace_ctx::OPT_ARRAY);
 #endif
-  do_add(ctx->current_Json(), v);
+  do_add(ctx->current_Json(), ctx->thd, v);
   return *this;
 }
 
